@@ -214,24 +214,17 @@ class Application(tk.Frame):
         self.btn_start = tk.Button(self.master, text="Start simulation", command=self.startSimulation)
         self.btn_start.grid(column=0, row=3)
 
-        self.btn_simulate = tk.Button(self.master, text="Step simulation", command=self.stepSimulation)
-        self.btn_simulate.grid(column=1, row=3)
+        self.btn_start = tk.Button(self.master, text="Step simulation", command=self.stepSimulation)
+        self.btn_start.grid(column=1, row=3)
 
-        #self.fig = plt.figure() # What does this line do
+        self.fig = plt.figure()
         # self.plottingArea = FigureCanvasTkAgg(self.fig, master=self.master)
         # self.plottingArea.get_tk_widget().grid(row=3, column=2)
-        self.canvas_width = 1100
-        self.canvas_height = 900
+        self.canvas_width = 1000
+        self.canvas_height = 800
         self.plottingArea = tk.Canvas(self.master, bg='white', height=self.canvas_height, width=self.canvas_width)
         self.plottingArea.grid(row=3, column=2)
         self.plottingArea.bind("<Button-1>", self.settingCell)
-        """self.canvas_width2 = 1000
-        self.canvas_height2 = 800
-        self.plottingArea2 = tk.Canvas(self.master, bg='white', height=self.canvas_height2, width=self.canvas_width2)
-        self.plottingArea2.grid(row=5, column=4)
-        self.plottingArea2.bind("<Button-1>", self.settingCell)"""
-
-
 
         # self.fig.canvas.callbacks.connect("button_press_event", self.settingCell)
 
@@ -241,13 +234,6 @@ class Application(tk.Frame):
         # self.quitbutton = tk.Button(master=root, text="exit", command=self.quit)
         # self.quitbutton.grid(row=0, column=2)
 
-    def create_circle(self,x, y, r, canvasName):  # center coordinates, radius
-        x0 = x - r
-        y0 = y - r
-        x1 = x + r
-        y1 = y + r
-        return canvasName.create_oval(x0, y0, x1, y1)
-
     def settingCell(self, event):
         cell_id_x = int(event.x / self.cell_width)
         cell_id_y = int(event.y / self.cell_height)
@@ -256,7 +242,6 @@ class Application(tk.Frame):
         cell_pos_y = cell_id_y * self.cell_height
 
         self.drawCell(cell_pos_x, cell_pos_y, self.getNextCellState(cell_id_x, cell_id_y))
-
 
     def getNextCellState(self, x, y):
         if (x, y) in self.cellState[self.PEDES]:
@@ -314,16 +299,9 @@ class Application(tk.Frame):
 
         self.cell_width = self.canvas_width / self.width
         self.cell_height = self.canvas_height / self.height
-        #self.plottingArea.create_line(100, 250, 400, 250, width=2)
-        #self.plottingArea.create_line(100, 250, 100, 50, width=2)
         for i in range(self.width):
-            #print(i)
-            self.plottingArea.create_text(self.cell_width * i + self.cell_width / 2,
-                                          self.cell_height / 2, text=i+1)
             self.plottingArea.create_line(self.cell_width * i, 0, self.cell_width * i, self.canvas_height)
         for i in range(self.height):
-            self.plottingArea.create_text(self.cell_width / 2, self.cell_height * i + self.cell_height / 2,
-                                          text=i+1)
             self.plottingArea.create_line(0, self.cell_height * i, self.canvas_width, self.cell_height * i)
 
         self.cellState = {self.PEDES: [], self.TARGET: [], self.OBSTACLE: []}
@@ -368,7 +346,6 @@ class Application(tk.Frame):
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.title("CELLULAR AUTOMATON BASED CROWD SIMULATION")
     app = Application(master=root)
     app.mainloop()
 
