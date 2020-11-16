@@ -2,7 +2,8 @@ import numpy as np
 import math
 from matplotlib.patches import Rectangle
 from itertools import chain, product
-
+from dijsktra import *
+from fmm import *
 import tkinter as tk
 import matplotlib.pyplot as plt
 
@@ -36,10 +37,12 @@ class Component:
 
 class Pedestrian(Component):
 
-    def __init__(self, position, drawConfig, target):
+    def __init__(self, position, drawConfig, target, id):
         super().__init__(position, drawConfig)
         self.trajectory = []  # used for visualizing the path a pedestrian followed
         self.target = target  # if there are more than 1 targets in the scenario
+        self.id = id
+        self.at_goal = False
 
     def label(self):
         return 'P'
@@ -59,6 +62,7 @@ class Target(Component):
     def __init__(self, position, drawConfig, distanceMap):
         super().__init__(position, drawConfig)
         self.distanceMap = distanceMap
+        self.target_env = []
 
     def label(self):
         return 'T'
@@ -91,31 +95,52 @@ class Automaton:
         if isinstance(grid_size, tuple) and len(grid_size) == 2:
             self.width, self.height = grid_size[0], grid_size[1]
 
-            self.distanceMaps = self.calculateDistanceMaps(targets, obstables)
+
 
             if len(targets) == 1:  # if only one target given, this target is set for all pedestrians
                 targets = len(pedestrians) * targets
             # creating the objects for visualization
             self.pedestrians = self.createPedestrians(pedestrians, targets)
             self.obstacles = self.createObstacles(obstables)
-
+            self.board = Graph(self.width, self.height, obstables)
+            self.obst = obstables
+            self.distanceMaps = self.calculateDistanceMaps(targets)
             self.step_num = 0
+            self.pedes_coord = {}
+            for ped in self.pedestrians:
+                self.pedes_coord[ped.id] = str(ped.current_x) + str(ped.current_y)
+            print(self.pedes_coord)
             self.graphics = self.generateGraphic()
 
     def createPedestrians(self, pedestrians, targets):
-        return [Pedestrian(position, Automaton.PEDES, target) for position, target in zip(pedestrians, targets)]
+        index = [i for i in range(len(pedestrians))]
+        return [Pedestrian(position, Automaton.PEDES, target, id) for position, target, id in zip(pedestrians, targets, index)]
 
     def createObstacles(self, obstacles):
         return [Obstacle(position, Automaton.OBSTACLE) for position in obstacles]
 
-    def calculateDistanceMaps(self, targets, obstacles):
+    def calculateDistanceMaps(self, targets):
         different_target = []
         distance_maps = dict()
         for target in targets:
             if target not in different_target:
                 different_target.append(target)
-                distance_maps[target] = self.calculateDistance(target, obstacles)
+                # Uncomment to use fmm
+                # distancemap = fmm(target, self.obst, self.width, self.height)
+                # Using dijsktra
+                distancemap, _ = dijsktra(self.board, str(target[0])+str(target[1]))
+                distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
+                distance_maps[target].target_env = self.calculateTargetNeighbors(target)
+                # distance_maps[target] = self.calculateDistance(target, obstacles)
         return distance_maps
+
+    def calculateTargetNeighbors(self, target):
+        fields = list(self.board.nodes)
+        target_env = []
+        for i, j in product([0, 1, -1], repeat=2):
+            if str(target[0] + i) + str(target[1] + j) in fields:
+                target_env.append(str(target[0] + i) + str(target[1] + j))
+        return target_env
 
     def calculateDistance(self, target, obstacles):
         def single_distance(x, y):
@@ -168,19 +193,45 @@ class Automaton:
         return chain(pedes_generator, target_generator, obstacles_generator)
 
     def step(self):
+        dmax = 1
         for pedes in self.pedestrians:
-            smallest = ()
-            best_distance = float('inf')
-            # having a look at all the 9 neighbors of the current pedestrian
-            for i, j in product([0, 1, -1], repeat=2):
-                if 0 <= pedes.current_x + i < self.width and 0 <= pedes.current_y + j < self.height:  # staying in bound
-                    distance = self.distanceMaps[pedes.target].distanceMap[pedes.current_x + i][pedes.current_y + j]
-                    if distance < best_distance:
-                        best_distance = distance
-                        smallest = (i, j)
-            pedes.current_x += smallest[0]
-            pedes.current_y += smallest[1]
-        # self.graphics = self.generateGraphic()
+            if not pedes.at_goal:
+                smallest = ()
+                best_distance = float('inf')
+                fields = list(self.board.nodes)
+                # print(fields)
+                # print(pedes.id)
+                # having a look at all the 9 neighbors of the current pedestrian
+                for i, j in product([0, 1, -1], repeat=2):
+                    if str(pedes.current_x + i)+str(pedes.current_y + j) in fields:  # staying in bound
+                        # Uncomment to use fmm
+                        # distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width, self.height)
+                        # Using dijsktra
+                        distance_map, _ = dijsktra(self.board, str(pedes.current_x + i)+str(pedes.current_y + j))
+                        # print(distance_map)
+                        dist = 0
+                        for k in list(self.pedes_coord.keys()):
+                            # print(distance_map[self.pedes_coord[k]])
+                            if int(k) == int(pedes.id):
+                                pass
+                            elif str(pedes.current_x + i)+str(pedes.current_y + j) == self.pedes_coord[k]:
+                                dist += float('inf')
+                            elif distance_map[self.pedes_coord[k]] < dmax:
+                                dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
+                        distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+str(pedes.current_y + j)]
+                        print(distance)
+                        distance += dist
+                        if distance < best_distance:
+                            best_distance = distance
+                            smallest = (i, j)
+                pedes.current_x += smallest[0]
+                pedes.current_y += smallest[1]
+                self.pedes_coord[pedes.id] = str(pedes.current_x)+str(pedes.current_y)
+                # print(self.pedes_coord)
+                # print(self.distanceMaps[pedes.target].target_env)
+                if str(pedes.current_x)+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
+                    pedes.at_goal = True
+            # self.graphics = self.generateGraphic()
 
 
 class Application(tk.Frame):
