@@ -80,5 +80,5 @@ def dijsktra(graph, initial):
       if edge not in visited or weight < visited[edge]:
         visited[edge] = weight
         path[edge] = min_node
-
+  # print(visited)
   return visited, path

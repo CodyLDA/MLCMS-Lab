@@ -103,8 +103,8 @@ class Automaton:
             self.pedestrians = self.createPedestrians(pedestrians, targets)
             self.obstacles = self.createObstacles(obstables)
             self.board = Graph(self.width, self.height, obstables)
-            self.distanceMaps = self.calculateDistanceMaps(targets, obstables)
             self.obst = obstables
+            self.distanceMaps = self.calculateDistanceMaps(targets)
             self.step_num = 0
             self.pedes_coord = {}
             for ped in self.pedestrians:
@@ -119,14 +119,14 @@ class Automaton:
     def createObstacles(self, obstacles):
         return [Obstacle(position, Automaton.OBSTACLE) for position in obstacles]
 
-    def calculateDistanceMaps(self, targets, obstacles):
+    def calculateDistanceMaps(self, targets):
         different_target = []
         distance_maps = dict()
         for target in targets:
             if target not in different_target:
                 different_target.append(target)
                 # Uncomment to use fmm
-                # distance_maps = fmm(target, self.obst, self.width, self.height)
+                # distancemap = fmm(target, self.obst, self.width, self.height)
                 # Using dijsktra
                 distancemap, _ = dijsktra(self.board, str(target[0])+str(target[1]))
                 distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
@@ -199,26 +199,27 @@ class Automaton:
                 smallest = ()
                 best_distance = float('inf')
                 fields = list(self.board.nodes)
-                #print(fields)
-                #print(pedes.id)
+                # print(fields)
+                # print(pedes.id)
                 # having a look at all the 9 neighbors of the current pedestrian
                 for i, j in product([0, 1, -1], repeat=2):
                     if str(pedes.current_x + i)+str(pedes.current_y + j) in fields:  # staying in bound
                         # Uncomment to use fmm
-                        # distance_maps = fmm(target, self.obst, self.width, self.height)
+                        # distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width, self.height)
                         # Using dijsktra
                         distance_map, _ = dijsktra(self.board, str(pedes.current_x + i)+str(pedes.current_y + j))
-                        #print(distance_map)
+                        # print(distance_map)
                         dist = 0
                         for k in list(self.pedes_coord.keys()):
-                            print(distance_map[self.pedes_coord[k]])
+                            # print(distance_map[self.pedes_coord[k]])
                             if int(k) == int(pedes.id):
-                                print("PAssing")
                                 pass
+                            elif str(pedes.current_x + i)+str(pedes.current_y + j) == self.pedes_coord[k]:
+                                dist += float('inf')
                             elif distance_map[self.pedes_coord[k]] < dmax:
-                                print("HEHRE")
                                 dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+str(pedes.current_y + j)]
+                        print(distance)
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
@@ -226,8 +227,8 @@ class Automaton:
                 pedes.current_x += smallest[0]
                 pedes.current_y += smallest[1]
                 self.pedes_coord[pedes.id] = str(pedes.current_x)+str(pedes.current_y)
-                print(self.pedes_coord)
-                #print(self.distanceMaps[pedes.target].target_env)
+                # print(self.pedes_coord)
+                # print(self.distanceMaps[pedes.target].target_env)
                 if str(pedes.current_x)+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
             # self.graphics = self.generateGraphic()
