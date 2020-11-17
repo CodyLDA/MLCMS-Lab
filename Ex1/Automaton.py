@@ -184,6 +184,7 @@ class Automaton:
                         if distance < best_distance:
                             best_distance = distance
                             smallest = (i, j)
+                pedes.trajectory.append((pedes.current_x, pedes.current_y))
                 pedes.current_x += smallest[0]
                 pedes.current_y += smallest[1]
                 self.pedes_coord[pedes.id] = str(pedes.current_x)+str(pedes.current_y)
