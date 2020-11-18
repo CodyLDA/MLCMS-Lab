@@ -16,6 +16,7 @@ class Application(tk.Frame):
         self.automaton = None
         self.lock_canvas = False
         self.running = False
+        self.width, self.height = 0, 0
 
         self.createWidgets()
 
@@ -49,7 +50,7 @@ class Application(tk.Frame):
         self.txt_height.insert(0, '10')
         self.txt_height.grid(column=1, row=1, padx=(0, 10))
 
-        self.btn_submit = tk.Button(self.inputFrame, text="Use grid size", command=self.generatePlainGrid)
+        self.btn_submit = tk.Button(self.inputFrame, text="Use grid size", command=self.submit_gridSize)
         self.btn_submit.grid(column=1, row=2, pady=(15, 0))
 
         self.btn_start = tk.Button(self.inputFrame, text="Start simulation", command=self.startSimulation)
@@ -257,14 +258,28 @@ class Application(tk.Frame):
             self.stepSimulation()
 
     def drawAutomaton(self):
+        self.drawTrajectory(self.automaton.pedestrians)
         self.drawerClasses(self.automaton.pedestrians)
         self.drawerClasses(self.automaton.distanceMaps.values())
         self.drawerClasses(self.automaton.obstacles)
 
+    def drawTrajectory(self, pedestrians):
+        for pedes in pedestrians:
+            if len(pedes.trajectory) > 0:
+                cell_pos_x, cell_pos_y = self.calcCellCoor(pedes.trajectory[0][0], pedes.trajectory[0][1])
+                self.drawCell(cell_pos_x, cell_pos_y, ('grey', 'x'))
+            for x, y in pedes.trajectory[1:]:
+                cell_pos_x, cell_pos_y = self.calcCellCoor(x, y)
+                self.drawCell(cell_pos_x, cell_pos_y, ('grey', ''))
+
+    def calcCellCoor(self, cell_x, cell_y):
+        return cell_x * self.cell_width, cell_y * self.cell_height
+
     def drawerClasses(self, liste):
         for list_obj in liste:
-            cell_pos_x = list_obj.current_x * self.cell_width
-            cell_pos_y = list_obj.current_y * self.cell_height
+            #cell_pos_x = list_obj.current_x * self.cell_width
+            #cell_pos_y = list_obj.current_y * self.cell_height
+            cell_pos_x, cell_pos_y = self.calcCellCoor(list_obj.current_x, list_obj.current_y)
             self.drawCell(cell_pos_x, cell_pos_y, list_obj.drawConfig)
 
     def drawCell(self, cell_pos_x, cell_pos_y, class_obj):
@@ -282,9 +297,15 @@ class Application(tk.Frame):
     def drawObjects(self):
         for key, cell_list in self.cellState.items():
             for x_coor, y_coor in cell_list:
-                cell_pos_x = x_coor * self.cell_width
-                cell_pos_y = y_coor * self.cell_height
+                #cell_pos_x = x_coor * self.cell_width
+                #cell_pos_y = y_coor * self.cell_height
+                cell_pos_x, cell_pos_y = self.calcCellCoor(x_coor, y_coor)
                 self.drawCell(cell_pos_x, cell_pos_y, key)
+
+    def submit_gridSize(self):
+        if (self.width, self.height) == (int(self.txt_width.get()), int(self.txt_height.get())):
+            return
+        self.clearApp()
 
     def generatePlainGrid(self):
         self.plottingArea.delete('all')

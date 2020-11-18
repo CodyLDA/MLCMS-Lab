@@ -99,7 +99,7 @@ class Automaton:
             self.step_num = 0
             self.pedes_coord = {}
             for ped in self.pedestrians:
-                self.pedes_coord[ped.id] = str(ped.current_x) + str(ped.current_y)
+                self.pedes_coord[ped.id] = str(ped.current_x) +','+ str(ped.current_y)
             print(self.pedes_coord)
 
     def createPedestrians(self, pedestrians, targets):
@@ -120,9 +120,10 @@ class Automaton:
                 # Using dijsktra
                 # distancemap, _ = dijsktra(self.board, str(target[0])+str(target[1]))
                 if self.algo == Automaton.DIJKSTRA:
-                    distancemap, _ = dijsktra(self.board, str(target[0]) + str(target[1]))
+                    distancemap, _ = dijsktra(self.board, str(target[0]) +','+ str(target[1]))
                 elif self.algo == Automaton.FMM:
                     distancemap = fmm(target, self.obst, self.width, self.height)
+
                 distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
                 distance_maps[target].target_env = self.calculateTargetNeighbors(target)
                 # distance_maps[target] = self.calculateDistance(target, obstacles)
@@ -132,8 +133,8 @@ class Automaton:
         fields = list(self.board.nodes)
         target_env = []
         for i, j in product([0, 1, -1], repeat=2):
-            if str(target[0] + i) + str(target[1] + j) in fields:
-                target_env.append(str(target[0] + i) + str(target[1] + j))
+            if str(target[0] + i) +','+ str(target[1] + j) in fields:
+                target_env.append(str(target[0] + i) +','+ str(target[1] + j))
         return target_env
 
     def calculateDistance(self, target, obstacles):
@@ -157,14 +158,14 @@ class Automaton:
                 # print(pedes.id)
                 # having a look at all the 9 neighbors of the current pedestrian
                 for i, j in product([0, 1, -1], repeat=2):
-                    if str(pedes.current_x + i)+str(pedes.current_y + j) in fields:  # staying in bound
+                    if str(pedes.current_x + i)+','+str(pedes.current_y + j) in fields:  # staying in bound
                         # Uncomment to use fmm
                         # distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width, self.height)
                         # Using dijsktra
                         # distance_map, _ = dijsktra(self.board, str(pedes.current_x + i)+str(pedes.current_y + j))
                         # print(distance_map)
                         if self.algo == Automaton.DIJKSTRA:
-                            distance_map, _ = dijsktra(self.board, str(pedes.current_x + i) + str(pedes.current_y + j))
+                            distance_map, _ = dijsktra(self.board, str(pedes.current_x + i) +','+ str(pedes.current_y + j))
                         elif self.algo == Automaton.FMM:
                             distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width,
                                                self.height)
@@ -174,20 +175,25 @@ class Automaton:
                             # print(distance_map[self.pedes_coord[k]])
                             if int(k) == int(pedes.id):
                                 pass
-                            elif str(pedes.current_x + i)+str(pedes.current_y + j) == self.pedes_coord[k]:
+                            elif str(pedes.current_x + i)+','+str(pedes.current_y + j) == self.pedes_coord[k]:
                                 dist += float('inf')
                             elif distance_map[self.pedes_coord[k]] < dmax:
                                 dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
-                        distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+str(pedes.current_y + j)]
+                        distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
+                        print("printing coordinates")
+                        print(str(pedes.current_x + i)+','+str(pedes.current_y + j))
+                        print("Printing distance")
                         print(distance)
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
                             smallest = (i, j)
+                pedes.trajectory.append((pedes.current_x, pedes.current_y))
                 pedes.current_x += smallest[0]
                 pedes.current_y += smallest[1]
-                self.pedes_coord[pedes.id] = str(pedes.current_x)+str(pedes.current_y)
+                self.pedes_coord[pedes.id] = str(pedes.current_x)+','+str(pedes.current_y)
                 # print(self.pedes_coord)
                 # print(self.distanceMaps[pedes.target].target_env)
-                if str(pedes.current_x)+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
+                if str(pedes.current_x)+','+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
+                    print("GOAL REACHED")
