@@ -44,13 +44,6 @@ class Graph:
                 if j - 1 >= 0:
                     if str(i) +','+ str(j - 1) not in self.obs:
                         self.add_edge(node_name, str(i) +','+ str(j - 1), 1)
-    print(self.distances[('8,0','8,1')])
-    print(self.distances[('8,1','8,2')])
-    print(self.distances[('8,2','8,3')])
-    print(self.distances[('8,3','8,4')])
-    
-    print(self.distances[('8,17','8,18')])
-    print(self.distances[('8,18','8,19')])
 
   def add_node(self, value):
     self.nodes.add(value)
@@ -62,8 +55,7 @@ class Graph:
 
 
 def dijsktra(graph, initial):
-  print("Printing Initial")
-  print(initial)
+
   visited = {initial: 0}
   path = {}
 
@@ -89,8 +81,6 @@ def dijsktra(graph, initial):
       if edge not in visited or weight < visited[edge]:
         visited[edge] = weight
         path[edge] = min_node
-  #print(visited['8,0'])
-  #print(visited['9,1'])
   return visited, path
 
 
