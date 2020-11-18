@@ -9,41 +9,41 @@ class Graph:
     self.obs = []
 
     for obst in obstacles:
-        self.obs.append(str(obst[0]) + str(obst[1]))
+        self.obs.append(str(obst[0]) +','+ str(obst[1]))
 
     for i in range(width):
         for j in range(height):
-            node_name = str(i)+str(j)
+            node_name = str(i)+','+str(j)
             if node_name not in self.obs:
                 self.add_node(node_name)
                 if i+1 < width:
-                    if str(i+1)+str(j) not in self.obs:
-                        self.add_edge(node_name, str(i+1)+str(j), 1)
+                    if str(i+1)+','+str(j) not in self.obs:
+                        self.add_edge(node_name, str(i+1)+','+str(j), 1)
                     if j+1 < height:
-                        if str(i + 1) + str(j + 1) not in self.obs:
-                            self.add_edge(node_name, str(i + 1) + str(j + 1), np.sqrt(2))
+                        if str(i + 1) +','+ str(j + 1) not in self.obs:
+                            self.add_edge(node_name, str(i + 1) +','+ str(j + 1), np.sqrt(2))
                     if j-1 >= 0:
-                        if str(i + 1) + str(j - 1) not in self.obs:
-                            self.add_edge(node_name, str(i + 1) + str(j - 1), np.sqrt(2))
+                        if str(i + 1) +','+ str(j - 1) not in self.obs:
+                            self.add_edge(node_name, str(i + 1) +','+ str(j - 1), np.sqrt(2))
 
                 if i-1 >= 0:
-                    if str(i-1)+str(j) not in self.obs:
-                        self.add_edge(node_name, str(i-1)+str(j), 1)
+                    if str(i-1)+','+str(j) not in self.obs:
+                        self.add_edge(node_name, str(i-1)+','+str(j), 1)
                     if j+1 < height:
-                        if str(i - 1) + str(j + 1) not in self.obs:
-                            self.add_edge(node_name, str(i - 1) + str(j + 1), np.sqrt(2))
+                        if str(i - 1) +','+ str(j + 1) not in self.obs:
+                            self.add_edge(node_name, str(i - 1) +','+ str(j + 1), np.sqrt(2))
 
                     if j-1 >= 0:
-                        if str(i - 1) + str(j - 1) not in self.obs:
-                            self.add_edge(node_name, str(i - 1) + str(j - 1), np.sqrt(2))
+                        if str(i - 1) +','+ str(j - 1) not in self.obs:
+                            self.add_edge(node_name, str(i - 1) +','+ str(j - 1), np.sqrt(2))
 
                 if j+1 < height:
-                    if str(i) + str(j + 1) not in self.obs:
-                        self.add_edge(node_name, str(i) + str(j + 1), 1)
+                    if str(i) +','+ str(j + 1) not in self.obs:
+                        self.add_edge(node_name, str(i) +','+ str(j + 1), 1)
 
                 if j - 1 >= 0:
-                    if str(i) + str(j - 1) not in self.obs:
-                        self.add_edge(node_name, str(i) + str(j - 1), 1)
+                    if str(i) +','+ str(j - 1) not in self.obs:
+                        self.add_edge(node_name, str(i) +','+ str(j - 1), 1)
 
   def add_node(self, value):
     self.nodes.add(value)
@@ -55,6 +55,7 @@ class Graph:
 
 
 def dijsktra(graph, initial):
+
   visited = {initial: 0}
   path = {}
 
@@ -80,5 +81,6 @@ def dijsktra(graph, initial):
       if edge not in visited or weight < visited[edge]:
         visited[edge] = weight
         path[edge] = min_node
-  # print(visited)
   return visited, path
+
+
