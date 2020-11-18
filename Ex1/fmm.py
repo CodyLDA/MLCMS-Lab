@@ -9,8 +9,8 @@ def fmm(initial, obstacles, width, height):
     dist_map = {}
     for i in range(width):
         for j in range(height):
-            dist_map[str(i)+str(j)] = dist_mat[i,j]
+            dist_map[str(i)+','+str(j)] = dist_mat[i,j]
     for obst in obstacles:
-        dist_map[str(obst[0]) + str(obst[1])] = float('inf')
+        dist_map[str(obst[0]) +','+ str(obst[1])] = float('inf')
     # print(dist_map)
     return dist_map

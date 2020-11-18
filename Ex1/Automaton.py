@@ -180,10 +180,10 @@ class Automaton:
                             elif distance_map[self.pedes_coord[k]] < dmax:
                                 dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
-                        print("printing coordinates")
-                        print(str(pedes.current_x + i)+','+str(pedes.current_y + j))
-                        print("Printing distance")
-                        print(distance)
+                        #print("printing coordinates")
+                        #print(str(pedes.current_x + i)+','+str(pedes.current_y + j))
+                        #print("Printing distance")
+                        #1print(distance)
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
