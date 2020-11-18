@@ -232,7 +232,8 @@ class Application(tk.Frame):
     def stepSimulation(self):
         if self.automaton:
             self.lbl_failedStep['text'] = ""
-            self.automaton.step()
+            for i in range(10):
+                self.automaton.step()
             self.generatePlainGrid()
             self.drawAutomaton()
         else:

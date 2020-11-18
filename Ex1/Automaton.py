@@ -33,6 +33,8 @@ class Pedestrian(Component):
         self.target = target  # if there are more than 1 targets in the scenario
         self.id = id
         self.at_goal = False
+        self.nextStepTime = 0
+        self.plannedStep = (0, 0)
 
     def label(self):
         return 'P'
@@ -101,6 +103,7 @@ class Automaton:
             for ped in self.pedestrians:
                 self.pedes_coord[ped.id] = str(ped.current_x) + str(ped.current_y)
             print(self.pedes_coord)
+            self.stepCounter = 0
 
     def createPedestrians(self, pedestrians, targets):
         index = [i for i in range(len(pedestrians))]
@@ -149,7 +152,11 @@ class Automaton:
     def step(self):
         dmax = 1
         for pedes in self.pedestrians:
-            if not pedes.at_goal:
+            if not pedes.at_goal and pedes.nextStepTime == self.stepCounter:
+                if pedes.nextStepTime > 0:
+                    pedes.trajectory.append((pedes.current_x, pedes.current_y))
+                    pedes.current_x += pedes.plannedStep[0]
+                    pedes.current_y += pedes.plannedStep[1]
                 smallest = ()
                 best_distance = float('inf')
                 fields = list(self.board.nodes)
@@ -184,11 +191,17 @@ class Automaton:
                         if distance < best_distance:
                             best_distance = distance
                             smallest = (i, j)
-                pedes.trajectory.append((pedes.current_x, pedes.current_y))
-                pedes.current_x += smallest[0]
-                pedes.current_y += smallest[1]
+                #pedes.trajectory.append((pedes.current_x, pedes.current_y))
+                #pedes.current_x += smallest[0]
+                #pedes.current_y += smallest[1]
+                pedes.plannedStep = (smallest[0], smallest[1])
+                if abs(smallest[0]) + abs(smallest[1]) == 2:
+                    pedes.nextStepTime += 10
+                else:
+                    pedes.nextStepTime += 7
                 self.pedes_coord[pedes.id] = str(pedes.current_x)+str(pedes.current_y)
                 # print(self.pedes_coord)
                 # print(self.distanceMaps[pedes.target].target_env)
                 if str(pedes.current_x)+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
+        self.stepCounter += 1
