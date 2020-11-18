@@ -101,7 +101,8 @@ class Automaton:
             self.step_num = 0
             self.pedes_coord = {}
             for ped in self.pedestrians:
-                self.pedes_coord[ped.id] = str(ped.current_x) +','+ str(ped.current_y)
+                #self.pedes_coord[ped.id] = str(ped.current_x) +','+ str(ped.current_y)
+                self.pedes_coord[ped.id] = ped
             print(self.pedes_coord)
             self.stepCounter = 0
 
@@ -158,6 +159,7 @@ class Automaton:
                     pedes.trajectory.append((pedes.current_x, pedes.current_y))
                     pedes.current_x += pedes.plannedStep[0]
                     pedes.current_y += pedes.plannedStep[1]
+                    pedes.plannedStep = (0, 0)
                 smallest = ()
                 best_distance = float('inf')
                 fields = list(self.board.nodes)
@@ -178,13 +180,18 @@ class Automaton:
                                                self.height)
 
                         dist = 0
-                        for k in list(self.pedes_coord.keys()):
+                        for k, other_pedes in list(self.pedes_coord.items()):
+                            #other_pedes_x = int(self.pedes_coord[k].split(',')[0])
+                            #other_pedes_y = int(self.pedes_coord[k].split(',')[1])
                             # print(distance_map[self.pedes_coord[k]])
                             if int(k) == int(pedes.id):
                                 pass
-                            elif str(pedes.current_x + i)+','+str(pedes.current_y + j) == self.pedes_coord[k]:
+                            #elif str(pedes.current_x + i)+','+str(pedes.current_y + j) == self.pedes_coord[k]:
+                            elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x, other_pedes.current_y):
                                 dist += float('inf')
-                            elif distance_map[self.pedes_coord[k]] < dmax:
+                            elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x + other_pedes.plannedStep[0], other_pedes.current_y + other_pedes.plannedStep[1]):
+                                dist += float('inf')
+                            elif distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)] < dmax:
                                 dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
                         #print("printing coordinates")
@@ -203,10 +210,12 @@ class Automaton:
                     pedes.nextStepTime += 10
                 else:
                     pedes.nextStepTime += 7
-                self.pedes_coord[pedes.id] = str(pedes.current_x)+','+str(pedes.current_y)
+                #self.pedes_coord[pedes.id] = str(pedes.current_x)+','+str(pedes.current_y)
+                self.pedes_coord[pedes.id] = pedes
                 # print(self.pedes_coord)
                 # print(self.distanceMaps[pedes.target].target_env)
                 if str(pedes.current_x)+','+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
+                    pedes.plannedStep = (0, 0)
                     print("GOAL REACHED")
         self.stepCounter += 1
