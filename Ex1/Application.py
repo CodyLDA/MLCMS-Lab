@@ -114,7 +114,7 @@ class Application(tk.Frame):
 
     def submit_dmax(self):
         self.resetToInit()
-        self.dmax = int(self.txt_dmax.get())
+        self.dmax = float(self.txt_dmax.get())
 
     def createSwitchFrame(self):
         self.switchFrame = tk.Frame(self.inputFrame)
