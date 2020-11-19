@@ -286,7 +286,7 @@ class Application(tk.Frame):
         self.lbl_failedStart.configure(text='')
         self.lock_canvas = True
         self.automaton = Automaton(grid_size=(self.width, self.height), pedestrians=self.cellState[self.PEDES],
-                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get())
+                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get(), dmax=self.dmax)
 
     def stepSimulation(self):
         if self.automaton:
