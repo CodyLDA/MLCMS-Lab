@@ -17,6 +17,7 @@ class Application(tk.Frame):
         self.lock_canvas = False
         self.running = False
         self.width, self.height = 0, 0
+        self.dmax = 1
 
         self.createWidgets()
 
@@ -83,6 +84,7 @@ class Application(tk.Frame):
 
         self.createAlgoSwitchFrame()
         self.createScenarioSwitchFrame()
+        self.createDmaxField()
 
     def createSimuBtn(self):
         self.simubtnFrame = tk.Frame(self.inputFrame)
@@ -94,6 +96,25 @@ class Application(tk.Frame):
         self.btn_stopSimulation.pack(side='left', padx=(10, 0))
 
         self.simubtnFrame.grid(column=1, row=7, padx=(0, 10), pady=(15, 0))
+
+    def createDmaxField(self):
+        self.dmaxFrame = tk.Frame(self.inputFrame)
+
+        self.lbl_dmax = tk.Label(self.dmaxFrame, text="Avoidance r_max:")
+        self.lbl_dmax.grid(row=0, padx=(10, 20))
+
+        self.txt_dmax = tk.Entry(self.dmaxFrame, width=20)
+        self.txt_dmax.insert(0, '1')
+        self.txt_dmax.grid(column=1, row=0, padx=(0, 20))
+
+        self.btn_submit_dmax = tk.Button(self.dmaxFrame, text="Set r_max", command=self.submit_dmax)
+        self.btn_submit_dmax.grid(column=2, row=0, pady=(0, 0))
+
+        self.dmaxFrame.grid(column=0, row=11, padx=(0, 10), pady=(30, 0))
+
+    def submit_dmax(self):
+        self.resetToInit()
+        self.dmax = int(self.txt_dmax.get())
 
     def createSwitchFrame(self):
         self.switchFrame = tk.Frame(self.inputFrame)
@@ -137,6 +158,7 @@ class Application(tk.Frame):
         self.switchScenarioFrame = tk.Frame(self.inputFrame)
 
         self.scene_chicken = 'chicken'
+        self.scene_circle_small = 'circle_small'
         self.scene_circle = 'circle'
         self.scene_single = 'single'
         self.scene_corridor = 'corridor'
@@ -144,18 +166,23 @@ class Application(tk.Frame):
         self.scene_bottle2 = 'bottle2'
         self.switch_scene = tk.StringVar(value='')
         self.btn_chicken = tk.Radiobutton(self.switchScenarioFrame, text='Chicken', variable=self.switch_scene, indicatoron=False, value=self.scene_chicken, command=self.changeScene)
-        self.btn_circle = tk.Radiobutton(self.switchScenarioFrame, text='Circle', variable=self.switch_scene, indicatoron=False, value=self.scene_circle, command=self.changeScene)
+        self.btn_circle_small = tk.Radiobutton(self.switchScenarioFrame, text='Circle Small', variable=self.switch_scene,
+                                         indicatoron=False, value=self.scene_circle_small, command=self.changeScene)
+        self.btn_circle = tk.Radiobutton(self.switchScenarioFrame, text='Circle Large', variable=self.switch_scene, indicatoron=False, value=self.scene_circle, command=self.changeScene)
         self.btn_single = tk.Radiobutton(self.switchScenarioFrame, text='Single', variable=self.switch_scene, indicatoron=False, value=self.scene_single, command=self.changeScene)
         self.btn_corridor = tk.Radiobutton(self.switchScenarioFrame, text='Corridor', variable=self.switch_scene, indicatoron=False, value=self.scene_corridor, command=self.changeScene)
         self.btn_bottle = tk.Radiobutton(self.switchScenarioFrame, text='Bottle 1', variable=self.switch_scene, indicatoron=False, value=self.scene_bottle, command=self.changeScene)
         self.btn_bottle2 = tk.Radiobutton(self.switchScenarioFrame, text='Bottle 2', variable=self.switch_scene, indicatoron=False, value=self.scene_bottle2, command=self.changeScene)
 
-        self.btn_chicken.pack(side='left', padx=(2, 2))
-        self.btn_circle.pack(side='left', padx=(2, 2))
-        self.btn_single.pack(side='left', padx=(2, 2))
-        self.btn_corridor.pack(side='left', padx=(2, 2))
-        self.btn_bottle.pack(side='left', padx=(2, 2))
-        self.btn_bottle2.pack(side='left', padx=(2, 2))
+        self.scene_label = tk.Label(self.switchScenarioFrame, text='Choose Scenario:')
+        self.scene_label.grid(column=0, row=0, padx=(0, 3), pady=(0, 8))
+        self.btn_chicken.grid(column=1, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_circle_small.grid(column=2, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_circle.grid(column=3, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_single.grid(column=1, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_corridor.grid(column=2, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_bottle.grid(column=3, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_bottle2.grid(column=4, row=2, padx=(0, 3), pady=(3, 3))
 
         self.switchScenarioFrame.grid(column=0, row=10, padx=(20, 10), pady=(50, 0))
 
@@ -259,7 +286,7 @@ class Application(tk.Frame):
         self.lbl_failedStart.configure(text='')
         self.lock_canvas = True
         self.automaton = Automaton(grid_size=(self.width, self.height), pedestrians=self.cellState[self.PEDES],
-                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get())
+                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get(), dmax=self.dmax)
         print(self.cellState)
 
     def stepSimulation(self):
@@ -362,11 +389,12 @@ class Application(tk.Frame):
         self.txt_height.insert(0, str(size))
 
     def setScenario(self, scene):
-        if scene == self.scene_circle:
-            #self.changingSceneGridSize(15)
-            #self.cellState = {('red', 'P'): [(7, 0), (0, 7), (14, 7), (7, 14), (2, 12), (12, 12)], ('yellow', 'T'): [(7, 7)], ('blue', 'O'): []}
+        if scene == self.scene_circle_small:
             self.changingSceneGridSize(20)
             self.cellState = {('red', 'P'): [(19, 9), (1, 9), (10, 0), (10, 18), (3, 16), (5, 2)], ('yellow', 'T'): [(10, 9)], ('blue', 'O'): []}
+        elif scene == self.scene_circle:
+            self.changingSceneGridSize(50)
+            self.cellState = {('red', 'P'): [(4, 24), (24, 44), (24, 4), (44, 24), (10, 10), (16, 42)], ('yellow', 'T'): [(24, 24)], ('blue', 'O'): []}
         elif scene == self.scene_chicken:
             self.changingSceneGridSize(15)
             self.cellState = {('red', 'P'): [(1, 7)], ('yellow', 'T'): [(8, 7)], ('blue', 'O'): [(3, 3), (4, 3), (5, 3), (6, 3), (7, 3), (7, 4), (7, 5), (7, 6), (7, 7), (7, 8), (7, 9), (7, 10), (7, 11), (6, 11), (5, 11), (4, 11), (3, 11)]}

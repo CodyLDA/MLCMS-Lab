@@ -85,7 +85,7 @@ class Automaton:
     DIJKSTRA = 'dijkstra'
     FMM = 'fmm'
 
-    def __init__(self, grid_size, pedestrians, targets, obstables, used_algo):
+    def __init__(self, grid_size, pedestrians, targets, obstables, used_algo, dmax):
         if isinstance(grid_size, tuple) and len(grid_size) == 2:
             self.width, self.height = grid_size[0], grid_size[1]
 
@@ -105,6 +105,7 @@ class Automaton:
                 self.pedes_coord[ped.id] = ped
             print(self.pedes_coord)
             self.stepCounter = 0
+            self.dmax = dmax
 
     def createPedestrians(self, pedestrians, targets):
         index = [i for i in range(len(pedestrians))]
@@ -152,7 +153,7 @@ class Automaton:
         return Target((target[0], target[1]), Automaton.TARGET, distancemap)
 
     def step(self):
-        dmax = 1
+        dmax = self.dmax
         for pedes in self.pedestrians:
             if not pedes.at_goal and pedes.nextStepTime == self.stepCounter:
                 if pedes.nextStepTime > 0:
@@ -192,7 +193,8 @@ class Automaton:
                             elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x + other_pedes.plannedStep[0], other_pedes.current_y + other_pedes.plannedStep[1]):
                                 dist += float('inf')
                             elif distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)] < dmax:
-                                dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
+                                #dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
+                                dist += np.exp(1/(distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)]**2 - dmax**2))
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
                         #print("printing coordinates")
                         #print(str(pedes.current_x + i)+','+str(pedes.current_y + j))
