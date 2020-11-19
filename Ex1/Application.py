@@ -316,8 +316,12 @@ class Application(tk.Frame):
         self.cell_width = self.canvas_width / self.width
         self.cell_height = self.canvas_height / self.height
         for i in range(self.width):
+            self.plottingArea.create_text(self.cell_width * i + self.cell_width / 2,
+                                          self.cell_height / 2, text=i + 1)
             self.plottingArea.create_line(self.cell_width * i, 0, self.cell_width * i, self.canvas_height)
         for i in range(self.height):
+            self.plottingArea.create_text(self.cell_width / 2, self.cell_height * i + self.cell_height / 2,
+                                          text=i + 1)
             self.plottingArea.create_line(0, self.cell_height * i, self.canvas_width, self.cell_height * i)
 
     def quit(self):
@@ -328,4 +332,5 @@ class Application(tk.Frame):
 if __name__ == '__main__':
     root = tk.Tk()
     app = Application(master=root)
+    root.title("CELLULAR AUTOMATON BASED CROWD SIMULATION")
     app.mainloop()

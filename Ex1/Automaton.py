@@ -31,8 +31,8 @@ class Pedestrian(Component):
         super().__init__(position, drawConfig)
         self.trajectory = []  # used for visualizing the path a pedestrian followed
         self.target = target  # if there are more than 1 targets in the scenario
-        self.id = id
-        self.at_goal = False
+        self.id = id  # id of the pedestrian, used as a unique identifier for each pedestrian
+        self.at_goal = False # set to true if pedestrian has reach the target (by being in one of the cells surrounding it)
 
     def label(self):
         return 'P'
@@ -51,8 +51,8 @@ class Target(Component):
 
     def __init__(self, position, drawConfig, distanceMap):
         super().__init__(position, drawConfig)
-        self.distanceMap = distanceMap
-        self.target_env = []
+        self.distanceMap = distanceMap # Saves the distance of each cell to the target
+        self.target_env = [] # Saves the coordinates/graph nodes of the cells surrounding the target
 
     def label(self):
         return 'T'
@@ -92,15 +92,21 @@ class Automaton:
             # creating the objects for visualization
             self.pedestrians = self.createPedestrians(pedestrians, targets)
             self.obstacles = self.createObstacles(obstables)
+            # creating the graph that contains all the nodes (cells without obstacles) and the edges between them
             self.board = Graph(self.width, self.height, obstables)
+            # saves the obstacles as an attribute
             self.obst = obstables
+            # the algorithm chosen by the user (Dijkstra/FMM)
             self.algo = used_algo
+            # saves the distance of each cell to the target
             self.distanceMaps = self.calculateDistanceMaps(targets)
             self.step_num = 0
+            # saves the current predestrian coordinates on the grid
             self.pedes_coord = {}
+            # initialize the dictionary with the coordinates chosen by the user
             for ped in self.pedestrians:
                 self.pedes_coord[ped.id] = str(ped.current_x) +','+ str(ped.current_y)
-            print(self.pedes_coord)
+            
 
     def createPedestrians(self, pedestrians, targets):
         index = [i for i in range(len(pedestrians))]
@@ -115,21 +121,21 @@ class Automaton:
         for target in targets:
             if target not in different_target:
                 different_target.append(target)
-                # Uncomment to use fmm
-                # distancemap = fmm(target, self.obst, self.width, self.height)
-                # Using dijsktra
-                # distancemap, _ = dijsktra(self.board, str(target[0])+str(target[1]))
+                # Generate distance map with the chosen algorithm
                 if self.algo == Automaton.DIJKSTRA:
                     distancemap, _ = dijsktra(self.board, str(target[0]) +','+ str(target[1]))
                 elif self.algo == Automaton.FMM:
                     distancemap = fmm(target, self.obst, self.width, self.height)
-
+                # Create target object with the distancemap attribute
                 distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
+                # Save the target neighbors in the target_env attribute 
                 distance_maps[target].target_env = self.calculateTargetNeighbors(target)
-                # distance_maps[target] = self.calculateDistance(target, obstacles)
+                
         return distance_maps
 
     def calculateTargetNeighbors(self, target):
+        # Find the neighbouring cells to the target and save them in a list. This is used later on to check
+        # if a pedestrian has reached the target
         fields = list(self.board.nodes)
         target_env = []
         for i, j in product([0, 1, -1], repeat=2):
@@ -138,6 +144,8 @@ class Automaton:
         return target_env
 
     def calculateDistance(self, target, obstacles):
+        # DEPRECATED FUNCTION, not in use anymore
+        # Used to generate the rudimentary cost function, where the distance is set to 'inf' if an obstacle is in the cell
         def single_distance(x, y):
             return math.sqrt((x - target[0]) ** 2 + (y - target[1]) ** 2)
 
@@ -148,52 +156,58 @@ class Automaton:
         return Target((target[0], target[1]), Automaton.TARGET, distancemap)
 
     def step(self):
+        # Perform a step
+        # Minimum allowed distance between Pedestrians
         dmax = 1
+        # Retrieve a list of the valid board coordinates (in bound and do not contain an obstacles)
+        fields = list(self.board.nodes)
+
         for pedes in self.pedestrians:
+
             if not pedes.at_goal:
+                # initialize next cell coordinates and best distance
                 smallest = ()
                 best_distance = float('inf')
-                fields = list(self.board.nodes)
-                # print(fields)
-                # print(pedes.id)
-                # having a look at all the 9 neighbors of the current pedestrian
+
+                # Check neighbouring cells
                 for i, j in product([0, 1, -1], repeat=2):
+
                     if str(pedes.current_x + i)+','+str(pedes.current_y + j) in fields:  # staying in bound
-                        # Uncomment to use fmm
-                        # distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width, self.height)
-                        # Using dijsktra
-                        # distance_map, _ = dijsktra(self.board, str(pedes.current_x + i)+str(pedes.current_y + j))
-                        # print(distance_map)
+                     
+                        # Calculate distance of cells to the pedestrian, used to check the distance between the pedestrians
                         if self.algo == Automaton.DIJKSTRA:
                             distance_map, _ = dijsktra(self.board, str(pedes.current_x + i) +','+ str(pedes.current_y + j))
                         elif self.algo == Automaton.FMM:
                             distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width,
                                                self.height)
-
-                        dist = 0
+                        
+                        dist = 0 # initialize the cost related to the distance between pedestrians
                         for k in list(self.pedes_coord.keys()):
-                            # print(distance_map[self.pedes_coord[k]])
-                            if int(k) == int(pedes.id):
+
+                            if int(k) == int(pedes.id): # if the current pedestrian skip
                                 pass
                             elif str(pedes.current_x + i)+','+str(pedes.current_y + j) == self.pedes_coord[k]:
+                                # if the cell is occupied set cost to inf
                                 dist += float('inf')
                             elif distance_map[self.pedes_coord[k]] < dmax:
+                                # set the cost to the provided formula
                                 dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
+
+                        # find the distance to the goal and add the cost for the distance to the pedestrians
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
-                        #print("printing coordinates")
-                        #print(str(pedes.current_x + i)+','+str(pedes.current_y + j))
-                        #print("Printing distance")
-                        #1print(distance)
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
                             smallest = (i, j)
+
+                # Add old coordinates to the trajectory and update the pedestrian's coordinates
                 pedes.trajectory.append((pedes.current_x, pedes.current_y))
                 pedes.current_x += smallest[0]
                 pedes.current_y += smallest[1]
+                # Update the current pedestrian's coordinates
                 self.pedes_coord[pedes.id] = str(pedes.current_x)+','+str(pedes.current_y)
-                # print(self.pedes_coord)
-                # print(self.distanceMaps[pedes.target].target_env)
+
+                # If the predestrian is in the neighborhood of the target set the attribute at_goal to True
                 if str(pedes.current_x)+','+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
-                    print("GOAL REACHED")
+
