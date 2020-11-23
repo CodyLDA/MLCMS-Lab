@@ -3,14 +3,19 @@ import numpy as np
 
 class Graph:
   def __init__(self, width, height, obstacles):
+    # Generate the graph with the nodes and the edges and the distances
+
     self.nodes = set()
     self.edges = defaultdict(list)
     self.distances = {}
     self.obs = []
+    # Generate array for the obstacles node names in order to ignore them later 
+    # when creating the nodes of the graph
 
     for obst in obstacles:
         self.obs.append(str(obst[0]) +','+ str(obst[1]))
 
+    # Create nodes and edges with distances
     for i in range(width):
         for j in range(height):
             node_name = str(i)+','+str(j)
@@ -55,7 +60,7 @@ class Graph:
 
 
 def dijsktra(graph, initial):
-
+  # Start graph search and calculate distance to the target
   visited = {initial: 0}
   path = {}
 
