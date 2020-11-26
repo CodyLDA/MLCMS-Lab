@@ -131,7 +131,7 @@ class Automaton:
                     distancemap = fmm(target, self.obst, self.width, self.height)
                 # Create target object with the distancemap attribute
                 distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
-                # Save the target neighbors in the target_env attribute 
+                # Save the target neighbors in the target_env attribute
                 distance_maps[target].target_env = self.calculateTargetNeighbors(target)
                 
         return distance_maps
@@ -159,8 +159,8 @@ class Automaton:
         return Target((target[0], target[1]), Automaton.TARGET, distancemap)
 
     def step(self):
-    	# Perform a step
-        # Minimum allowed distance between Pedestrians 
+        # Perform a step
+        # Minimum allowed distance between Pedestrians
         dmax = self.dmax
         # Retrieve a list of the valid board coordinates (in bound and do not contain an obstacles)
         fields = list(self.board.nodes)
@@ -172,14 +172,15 @@ class Automaton:
                     pedes.current_x += pedes.plannedStep[0]
                     pedes.current_y += pedes.plannedStep[1]
                     pedes.plannedStep = (0, 0)
+                # initialize next cell coordinates and best distance
                 smallest = ()
                 best_distance = float('inf')
 
                 # Check neighbouring cells
+                # having a look at all the 9 neighbors of the current pedestrian
                 for i, j in product([0, 1, -1], repeat=2):
 
                     if str(pedes.current_x + i)+','+str(pedes.current_y + j) in fields:  # staying in bound
-                     
                         # Calculate distance of cells to the pedestrian, used to check the distance between the pedestrians
                         if self.algo == Automaton.DIJKSTRA:
                             distance_map, _ = dijsktra(self.board, str(pedes.current_x + i) +','+ str(pedes.current_y + j))
@@ -189,8 +190,10 @@ class Automaton:
 
                         dist = 0 # initialize the cost related to the distance between pedestrians
                         for k, other_pedes in list(self.pedes_coord.items()):
+                          
                             if int(k) == int(pedes.id): # if the current pedestrian skip
                                 pass
+                            # if the cell is occupied set cost to inf
                             elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x, other_pedes.current_y):
                                 dist += float('inf')
                             elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x + other_pedes.plannedStep[0], other_pedes.current_y + other_pedes.plannedStep[1]):
@@ -199,8 +202,10 @@ class Automaton:
                             elif distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)] < dmax:
                                 # set the cost to the provided formula
                                 dist += np.exp(1/(distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)]**2 - dmax**2))
+
                         # find the distance to the goal and add the cost for the distance to the pedestrians
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
+
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
@@ -210,8 +215,9 @@ class Automaton:
                     pedes.nextStepTime += 10
                 else:
                     pedes.nextStepTime += 7
+                # update the pedestrian's coordinates
                 self.pedes_coord[pedes.id] = pedes
-				# If the predestrian is in the neighborhood of the target set the attribute at_goal to True
+                # If the predestrian is in the neighborhood of the target set the attribute at_goal to True
                 if str(pedes.current_x)+','+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
                     pedes.plannedStep = (0, 0)
