@@ -136,7 +136,7 @@ public class SIRGroupModel extends AbstractGroupModel<SIRGroup> {
 	private void initializeGroupsOfInitialPedestrians() {
 		// get all pedestrians already in topography
 		DynamicElementContainer<Pedestrian> c = topography.getPedestrianDynamicElements();
-
+                // assign each pedestrian to corresponding group (infected, susceptible and recovered)
 		if (c.getElements().size() > 0) {
 			for (Pedestrian pedestrian : c.getElements()) {
 				this.assignToGroup(pedestrian);
@@ -191,19 +191,21 @@ public class SIRGroupModel extends AbstractGroupModel<SIRGroup> {
 	@Override
 	public void update(final double simTimeInSec) {
 		// check the positions of all pedestrians and switch groups to INFECTED (or REMOVED).
-		
+		// If first update set simStep to simTimeInSec which is then equal to the simulation step size
 		if (this.Start == false) {
 			this.simStep = simTimeInSec;
 	   		this.Start = true;
 		}
+		// Get all of the pedestrians in the topography
 		DynamicElementContainer<Pedestrian> c = topography.getPedestrianDynamicElements();
-		ScenarioElementType type = ScenarioElementType.PEDESTRIAN;
+		// Iterate through each pedestrian, generate spacial map, check group and follow necessary steps depending on the situation.
 		if (c.getElements().size() > 0) {
 			LinkedCellsGrid<Pedestrian> CellsGrid = topography.getSpatialMap(Pedestrian.class);
 			for(Pedestrian p : c.getElements()) {
 				if (getGroup(p).getID() == SIRType.ID_RECOVERED.ordinal())
 					continue;
 				else if (getGroup(p).getID() == SIRType.ID_INFECTED.ordinal()){
+					// Limit the impact of the simStep on the output by using it as a weighing
 					if (this.random.nextDouble() < attributesSIRG.getRecoveryProbability() * (simStep)){
 						elementRemoved(p);
 						assignToGroup(p, SIRType.ID_RECOVERED.ordinal());
@@ -217,6 +219,7 @@ public class SIRGroupModel extends AbstractGroupModel<SIRGroup> {
 						for (Pedestrian p_neighbor : p_neighbors) {
 							if (p == p_neighbor || getGroup(p_neighbor).getID() != SIRType.ID_INFECTED.ordinal())
 								continue;
+							// Limit the impact of the simStep on the output by using it as a weighing
 							if (this.random.nextDouble() < attributesSIRG.getInfectionRate() * (simStep)) {
 								SIRGroup g = getGroup(p);
 								if (g.getID() == SIRType.ID_SUSCEPTIBLE.ordinal()) {
