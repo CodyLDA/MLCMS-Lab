@@ -17,6 +17,7 @@ class Application(tk.Frame):
         self.lock_canvas = False
         self.running = False
         self.width, self.height = 0, 0
+        self.dmax = 1
 
         self.createWidgets()
 
@@ -40,14 +41,14 @@ class Application(tk.Frame):
         self.lbl_width.grid(row=0, padx=(10, 20))
 
         self.txt_width = tk.Entry(self.inputFrame, width=20)
-        self.txt_width.insert(0, '10')
+        self.txt_width.insert(0, '15')
         self.txt_width.grid(column=1, row=0, padx=(0, 10))
 
         self.lbl_height = tk.Label(self.inputFrame, text="Height:")
         self.lbl_height.grid(row=1, padx=(10, 20))
 
         self.txt_height = tk.Entry(self.inputFrame, width=20)
-        self.txt_height.insert(0, '10')
+        self.txt_height.insert(0, '15')
         self.txt_height.grid(column=1, row=1, padx=(0, 10))
 
         self.btn_submit = tk.Button(self.inputFrame, text="Use grid size", command=self.submit_gridSize)
@@ -75,13 +76,15 @@ class Application(tk.Frame):
         self.lbl_simulateNumberStep.grid(column=0, row=6, padx=(10, 20), pady=(20, 0))
 
         self.txt_simulateNumberStep = tk.Entry(self.inputFrame, width=20)
-        self.txt_simulateNumberStep.insert(0, '10')
+        self.txt_simulateNumberStep.insert(0, '20')
         self.txt_simulateNumberStep.grid(column=1, row=6, padx=(0, 10), pady=(20, 0))
 
         self.createSimuBtn()
         self.createSwitchFrame()
 
         self.createAlgoSwitchFrame()
+        self.createScenarioSwitchFrame()
+        self.createDmaxField()
 
     def createSimuBtn(self):
         self.simubtnFrame = tk.Frame(self.inputFrame)
@@ -93,6 +96,25 @@ class Application(tk.Frame):
         self.btn_stopSimulation.pack(side='left', padx=(10, 0))
 
         self.simubtnFrame.grid(column=1, row=7, padx=(0, 10), pady=(15, 0))
+
+    def createDmaxField(self):
+        self.dmaxFrame = tk.Frame(self.inputFrame)
+
+        self.lbl_dmax = tk.Label(self.dmaxFrame, text="Avoidance r_max:")
+        self.lbl_dmax.grid(row=0, padx=(10, 20))
+
+        self.txt_dmax = tk.Entry(self.dmaxFrame, width=20)
+        self.txt_dmax.insert(0, '1')
+        self.txt_dmax.grid(column=1, row=0, padx=(0, 20))
+
+        self.btn_submit_dmax = tk.Button(self.dmaxFrame, text="Set r_max", command=self.submit_dmax)
+        self.btn_submit_dmax.grid(column=2, row=0, pady=(0, 0))
+
+        self.dmaxFrame.grid(column=0, row=11, padx=(0, 10), pady=(30, 0))
+
+    def submit_dmax(self):
+        self.resetToInit()
+        self.dmax = float(self.txt_dmax.get())
 
     def createSwitchFrame(self):
         self.switchFrame = tk.Frame(self.inputFrame)
@@ -131,6 +153,43 @@ class Application(tk.Frame):
         self.btn_fmm.pack(side='left', padx=(2, 2))
 
         self.switchAlgoFrame.grid(column=0, row=9, padx=(20, 10), pady=(50, 0))
+
+    def createScenarioSwitchFrame(self):
+        self.switchScenarioFrame = tk.Frame(self.inputFrame)
+
+        self.scene_chicken = 'chicken'
+        self.scene_circle_small = 'circle_small'
+        self.scene_circle = 'circle'
+        self.scene_single = 'single'
+        self.scene_corridor = 'corridor'
+        self.scene_bottle = 'bottle'
+        self.scene_bottle2 = 'bottle2'
+        self.switch_scene = tk.StringVar(value='')
+        self.btn_chicken = tk.Radiobutton(self.switchScenarioFrame, text='Chicken', variable=self.switch_scene, indicatoron=False, value=self.scene_chicken, command=self.changeScene)
+        self.btn_circle_small = tk.Radiobutton(self.switchScenarioFrame, text='Circle Small', variable=self.switch_scene,
+                                         indicatoron=False, value=self.scene_circle_small, command=self.changeScene)
+        self.btn_circle = tk.Radiobutton(self.switchScenarioFrame, text='Circle Large', variable=self.switch_scene, indicatoron=False, value=self.scene_circle, command=self.changeScene)
+        self.btn_single = tk.Radiobutton(self.switchScenarioFrame, text='Single', variable=self.switch_scene, indicatoron=False, value=self.scene_single, command=self.changeScene)
+        self.btn_corridor = tk.Radiobutton(self.switchScenarioFrame, text='Corridor', variable=self.switch_scene, indicatoron=False, value=self.scene_corridor, command=self.changeScene)
+        self.btn_bottle = tk.Radiobutton(self.switchScenarioFrame, text='Bottle 1', variable=self.switch_scene, indicatoron=False, value=self.scene_bottle, command=self.changeScene)
+        self.btn_bottle2 = tk.Radiobutton(self.switchScenarioFrame, text='Bottle 2', variable=self.switch_scene, indicatoron=False, value=self.scene_bottle2, command=self.changeScene)
+
+        self.scene_label = tk.Label(self.switchScenarioFrame, text='Choose Scenario:')
+        self.scene_label.grid(column=0, row=0, padx=(0, 3), pady=(0, 8))
+        self.btn_chicken.grid(column=1, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_circle_small.grid(column=2, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_circle.grid(column=3, row=1, padx=(0, 3), pady=(0, 3))
+        self.btn_single.grid(column=1, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_corridor.grid(column=2, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_bottle.grid(column=3, row=2, padx=(0, 3), pady=(3, 3))
+        self.btn_bottle2.grid(column=4, row=2, padx=(0, 3), pady=(3, 3))
+
+        self.switchScenarioFrame.grid(column=0, row=10, padx=(20, 10), pady=(50, 0))
+
+    def changeScene(self):
+        self.setScenario(self.switch_scene.get())
+        self.resetToInit()
+        self.startSimulation()
 
     def changeAlgo(self):
         self.resetToInit()
@@ -227,12 +286,13 @@ class Application(tk.Frame):
         self.lbl_failedStart.configure(text='')
         self.lock_canvas = True
         self.automaton = Automaton(grid_size=(self.width, self.height), pedestrians=self.cellState[self.PEDES],
-                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get())
+                                   targets=self.cellState[self.TARGET], obstables=self.cellState[self.OBSTACLE], used_algo=self.switch_algo.get(), dmax=self.dmax)
 
     def stepSimulation(self):
         if self.automaton:
             self.lbl_failedStep['text'] = ""
-            self.automaton.step()
+            for i in range(7):
+                self.automaton.step()
             self.generatePlainGrid()
             self.drawAutomaton()
         else:
@@ -323,6 +383,36 @@ class Application(tk.Frame):
             self.plottingArea.create_text(self.cell_width / 2, self.cell_height * i + self.cell_height / 2,
                                           text=i + 1)
             self.plottingArea.create_line(0, self.cell_height * i, self.canvas_width, self.cell_height * i)
+
+    def changingSceneGridSize(self, size):
+        self.width, self.height = size, size
+        self.txt_width.delete(0, 'end')
+        self.txt_width.insert(0, str(size))
+        self.txt_height.delete(0, 'end')
+        self.txt_height.insert(0, str(size))
+
+    def setScenario(self, scene):
+        if scene == self.scene_circle_small:
+            self.changingSceneGridSize(20)
+            self.cellState = {('red', 'P'): [(19, 9), (1, 9), (10, 0), (10, 18), (3, 16), (5, 2)], ('yellow', 'T'): [(10, 9)], ('blue', 'O'): []}
+        elif scene == self.scene_circle:
+            self.changingSceneGridSize(50)
+            self.cellState = {('red', 'P'): [(4, 24), (24, 44), (24, 4), (44, 24), (10, 10), (16, 42)], ('yellow', 'T'): [(24, 24)], ('blue', 'O'): []}
+        elif scene == self.scene_chicken:
+            self.changingSceneGridSize(15)
+            self.cellState = {('red', 'P'): [(1, 7)], ('yellow', 'T'): [(8, 7)], ('blue', 'O'): [(3, 3), (4, 3), (5, 3), (6, 3), (7, 3), (7, 4), (7, 5), (7, 6), (7, 7), (7, 8), (7, 9), (7, 10), (7, 11), (6, 11), (5, 11), (4, 11), (3, 11)]}
+        elif scene == self.scene_single:
+            self.changingSceneGridSize(50)
+            self.cellState = {('red', 'P'): [(5, 25)], ('yellow', 'T'): [(25, 25)], ('blue', 'O'): []}
+        elif scene == self.scene_corridor:
+            self.changingSceneGridSize(20)
+            self.cellState = {('red', 'P'): [(1, 14), (2, 15), (1, 17), (4, 15), (3, 13), (6, 14), (6, 16), (0, 16)], ('yellow', 'T'): [(16, 2)], ('blue', 'O'): [(1, 12), (0, 12), (3, 12), (2, 12), (4, 12), (5, 12), (6, 12), (8, 12), (7, 12), (9, 12), (10, 12), (11, 12), (12, 12), (13, 12), (13, 11), (13, 10), (13, 9), (13, 8), (13, 7), (13, 6), (13, 5), (13, 4), (13, 3), (0, 18), (1, 18), (2, 18), (3, 18), (4, 18), (5, 18), (6, 18), (7, 18), (8, 18), (9, 18), (10, 18), (11, 18), (12, 18), (13, 18), (15, 18), (14, 18), (16, 18), (17, 18), (18, 18), (19, 18), (19, 17), (19, 16), (19, 15), (19, 14), (19, 13), (19, 12), (19, 11), (19, 10), (19, 9), (19, 8), (19, 7), (19, 6), (19, 5), (19, 4), (19, 3)]}
+        elif scene == self.scene_bottle:
+            self.changingSceneGridSize(15)
+            self.cellState = {('red', 'P'): [(10, 14), (11, 1), (5, 1), (1, 1), (6, 12), (8, 13), (0, 12), (1, 6)], ('yellow', 'T'): [(13, 7)], ('blue', 'O'): [(12, 6), (11, 6), (10, 5), (9, 4), (8, 4), (7, 4), (6, 4), (5, 3), (4, 3), (3, 3), (12, 8), (11, 8), (10, 9), (9, 10), (8, 10), (7, 10), (6, 10), (5, 11), (4, 11), (3, 11), (13, 8), (13, 6), (14, 6), (14, 7), (14, 8), (11, 5), (10, 4), (6, 3), (6, 11), (10, 10), (11, 9)]}
+        elif scene == self.scene_bottle2:
+            self.changingSceneGridSize(15)
+            self.cellState = {('red', 'P'): [(0, 3), (0, 4), (0, 5), (0, 6), (0, 8), (0, 7), (0, 9), (0, 10), (0, 11)], ('yellow', 'T'): [(13, 7)], ('blue', 'O'): [(12, 6), (11, 6), (10, 5), (9, 4), (8, 4), (7, 4), (6, 4), (5, 3), (4, 3), (3, 3), (12, 8), (11, 8), (10, 9), (9, 10), (8, 10), (7, 10), (6, 10), (5, 11), (4, 11), (3, 11), (13, 8), (13, 6), (14, 6), (14, 7), (14, 8), (11, 5), (10, 4), (6, 3), (6, 11), (10, 10), (11, 9)]}
 
     def quit(self):
         root.quit()

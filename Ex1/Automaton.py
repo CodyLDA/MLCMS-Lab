@@ -31,8 +31,10 @@ class Pedestrian(Component):
         super().__init__(position, drawConfig)
         self.trajectory = []  # used for visualizing the path a pedestrian followed
         self.target = target  # if there are more than 1 targets in the scenario
-        self.id = id  # id of the pedestrian, used as a unique identifier for each pedestrian
+        self.id = id # id of the pedestrian, used as a unique identifier for each pedestrian
         self.at_goal = False # set to true if pedestrian has reach the target (by being in one of the cells surrounding it)
+        self.nextStepTime = 0
+        self.plannedStep = (0, 0)
 
     def label(self):
         return 'P'
@@ -83,7 +85,7 @@ class Automaton:
     DIJKSTRA = 'dijkstra'
     FMM = 'fmm'
 
-    def __init__(self, grid_size, pedestrians, targets, obstables, used_algo):
+    def __init__(self, grid_size, pedestrians, targets, obstables, used_algo, dmax):
         if isinstance(grid_size, tuple) and len(grid_size) == 2:
             self.width, self.height = grid_size[0], grid_size[1]
 
@@ -105,8 +107,9 @@ class Automaton:
             self.pedes_coord = {}
             # initialize the dictionary with the coordinates chosen by the user
             for ped in self.pedestrians:
-                self.pedes_coord[ped.id] = str(ped.current_x) +','+ str(ped.current_y)
-            
+            self.pedes_coord[ped.id] = ped
+            self.stepCounter = 0
+            self.dmax = dmax
 
     def createPedestrians(self, pedestrians, targets):
         index = [i for i in range(len(pedestrians))]
@@ -128,7 +131,7 @@ class Automaton:
                     distancemap = fmm(target, self.obst, self.width, self.height)
                 # Create target object with the distancemap attribute
                 distance_maps[target] = Target((target[0], target[1]), Automaton.TARGET, distancemap)
-                # Save the target neighbors in the target_env attribute 
+                # Save the target neighbors in the target_env attribute
                 distance_maps[target].target_env = self.calculateTargetNeighbors(target)
                 
         return distance_maps
@@ -158,56 +161,65 @@ class Automaton:
     def step(self):
         # Perform a step
         # Minimum allowed distance between Pedestrians
-        dmax = 1
+        dmax = self.dmax
         # Retrieve a list of the valid board coordinates (in bound and do not contain an obstacles)
         fields = list(self.board.nodes)
-
         for pedes in self.pedestrians:
-
-            if not pedes.at_goal:
+        	# initialize next cell coordinates and best distance
+            if not pedes.at_goal and pedes.nextStepTime == self.stepCounter:
+                if pedes.nextStepTime > 0:
+                    pedes.trajectory.append((pedes.current_x, pedes.current_y))
+                    pedes.current_x += pedes.plannedStep[0]
+                    pedes.current_y += pedes.plannedStep[1]
+                    pedes.plannedStep = (0, 0)
                 # initialize next cell coordinates and best distance
                 smallest = ()
                 best_distance = float('inf')
 
                 # Check neighbouring cells
+                # having a look at all the 9 neighbors of the current pedestrian
                 for i, j in product([0, 1, -1], repeat=2):
 
                     if str(pedes.current_x + i)+','+str(pedes.current_y + j) in fields:  # staying in bound
-                     
                         # Calculate distance of cells to the pedestrian, used to check the distance between the pedestrians
                         if self.algo == Automaton.DIJKSTRA:
                             distance_map, _ = dijsktra(self.board, str(pedes.current_x + i) +','+ str(pedes.current_y + j))
                         elif self.algo == Automaton.FMM:
                             distance_map = fmm([pedes.current_x + i, pedes.current_y + j], self.obst, self.width,
                                                self.height)
-                        
-                        dist = 0 # initialize the cost related to the distance between pedestrians
-                        for k in list(self.pedes_coord.keys()):
 
+                        dist = 0 # initialize the cost related to the distance between pedestrians
+                        for k, other_pedes in list(self.pedes_coord.items()):
+                          
                             if int(k) == int(pedes.id): # if the current pedestrian skip
                                 pass
-                            elif str(pedes.current_x + i)+','+str(pedes.current_y + j) == self.pedes_coord[k]:
+                            # if the cell is occupied set cost to inf
+                            elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x, other_pedes.current_y):
+                                dist += float('inf')
+                            elif (pedes.current_x + i, pedes.current_y + j) == (other_pedes.current_x + other_pedes.plannedStep[0], other_pedes.current_y + other_pedes.plannedStep[1]):
                                 # if the cell is occupied set cost to inf
                                 dist += float('inf')
-                            elif distance_map[self.pedes_coord[k]] < dmax:
+                            elif distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)] < dmax:
                                 # set the cost to the provided formula
-                                dist += np.exp(1/(distance_map[self.pedes_coord[k]]**2 - dmax**2))
+                                dist += np.exp(1/(distance_map[str(other_pedes.current_x) + "," + str(other_pedes.current_y)]**2 - dmax**2))
 
                         # find the distance to the goal and add the cost for the distance to the pedestrians
                         distance = self.distanceMaps[pedes.target].distanceMap[str(pedes.current_x + i)+','+str(pedes.current_y + j)]
+
                         distance += dist
                         if distance < best_distance:
                             best_distance = distance
                             smallest = (i, j)
-
-                # Add old coordinates to the trajectory and update the pedestrian's coordinates
-                pedes.trajectory.append((pedes.current_x, pedes.current_y))
-                pedes.current_x += smallest[0]
-                pedes.current_y += smallest[1]
-                # Update the current pedestrian's coordinates
-                self.pedes_coord[pedes.id] = str(pedes.current_x)+','+str(pedes.current_y)
-
+                pedes.plannedStep = (smallest[0], smallest[1])
+                if abs(smallest[0]) + abs(smallest[1]) == 2:
+                    pedes.nextStepTime += 10
+                else:
+                    pedes.nextStepTime += 7
+                # update the pedestrian's coordinates
+                self.pedes_coord[pedes.id] = pedes
                 # If the predestrian is in the neighborhood of the target set the attribute at_goal to True
                 if str(pedes.current_x)+','+str(pedes.current_y) in self.distanceMaps[pedes.target].target_env:
                     pedes.at_goal = True
-
+                    pedes.plannedStep = (0, 0)
+                    print("GOAL REACHED")
+        self.stepCounter += 1

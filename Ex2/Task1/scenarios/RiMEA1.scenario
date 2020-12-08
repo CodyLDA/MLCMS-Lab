@@ -93,7 +93,7 @@
       }
     },
     "attributesSimulation" : {
-      "finishTime" : 20.0,
+      "finishTime" : 32.0,
       "simTimeStepLength" : 0.4,
       "realTimeSimTimeRatio" : 0.1,
       "writeSimulationData" : true,
@@ -101,7 +101,7 @@
       "printFPS" : false,
       "digitsPerCoordinate" : 2,
       "useFixedSeed" : true,
-      "fixedSeed" : -3523241403026326214,
+      "fixedSeed" : -8557286989112422841,
       "simulationSeed" : 0
     },
     "attributesPsychology" : {
@@ -116,8 +116,8 @@
         "bounds" : {
           "x" : 0.0,
           "y" : 0.0,
-          "width" : 10.0,
-          "height" : 2.0
+          "width" : 42.0,
+          "height" : 3.0
         },
         "boundingBoxWidth" : 0.5,
         "bounded" : true,
@@ -127,13 +127,13 @@
       "measurementAreas" : [ ],
       "stairs" : [ ],
       "targets" : [ {
-        "id" : 4,
+        "id" : 2,
         "absorbing" : true,
         "shape" : {
-          "x" : 8.5,
-          "y" : 0.7741935483870968,
-          "width" : 0.5999999999999996,
-          "height" : 0.5258064516129031,
+          "x" : 41.0,
+          "y" : 0.5,
+          "width" : 0.5,
+          "height" : 2.0,
           "type" : "RECTANGLE"
         },
         "waitingTime" : 0.0,
@@ -163,18 +163,18 @@
           "walkingDirectionSameIfAngleLessOrEqual" : 45.0
         },
         "source" : null,
-        "targetIds" : [ 4 ],
+        "targetIds" : [ 2 ],
         "nextTargetListIndex" : 0,
         "isCurrentTargetAnAgent" : false,
         "position" : {
           "x" : 1.0,
-          "y" : 1.0
+          "y" : 1.5
         },
         "velocity" : {
           "x" : 0.0,
           "y" : 0.0
         },
-        "freeFlowSpeed" : 1.5419974908076624,
+        "freeFlowSpeed" : 1.33,
         "followers" : [ ],
         "idAsTarget" : -1,
         "isChild" : false,
