@@ -65,7 +65,7 @@ def visualise_output(vae, images=None, processed=True, num_samples = 0):
                 latent_mu, latent_logvar = vae.encoder(batch)
                 latent = vae.sample_with_reparam(latent_mu, latent_logvar)
                 theta = vae.decoder(latent)
-                sigma = vae.sigma_layer(theta)
+                sigma = vae.sigma_layer(latent)
                 samples = vae.sample_with_reparam(theta, sigma)
                 samples = samples.detach().cpu().numpy()
         return samples
@@ -73,7 +73,7 @@ def visualise_output(vae, images=None, processed=True, num_samples = 0):
 
 def process_data(images, num_samples):
     data = read_data(num_samples)
-    indexes = np.random.randint(low=0, high=data.shape[0], size=num_samples)
+    indexes = np.random.randint(low=0, high=767, size=num_samples)
     dist_new = np.ones((num_samples,2)).astype(np.float32)
     sample = 0
     for index in indexes:
