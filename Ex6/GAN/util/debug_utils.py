@@ -11,7 +11,7 @@ class Logger:
         if not log_filename:
             print('Error: Invalid address for log file')
             return
-        log_filename_ = open('../debug/log.txt')
+        log_filename_ = open(os.path.dirname(__file__) + '/../debug/log.txt')
         # conf = yaml.load(stream, Loader=yaml.FullLoader)
         # log_filename_ = conf['Debug']['LogFile']
         # log_filename_ = os.path.abspath(os.path.join(os.path.dirname(config_file), log_filename_))
@@ -19,7 +19,7 @@ class Logger:
         open_mode = "a+"
         if not os.path.exists(log_filename):
             open_mode = "w+"
-        self.log = open(log_filename, open_mode)  # append mode
+        self.log = open(os.path.dirname(__file__) + log_filename, open_mode)  # append mode
 
     def print_me(self, *args, date_and_time=True):
         print(args)

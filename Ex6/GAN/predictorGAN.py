@@ -19,9 +19,10 @@ from util.debug_utils import Logger
 class Generator(nn.Module):
     def __init__(self, noise_dim, embedding_size, lstm_size, hidden_size, relu_slope):
         super(Generator, self).__init__()
+        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Embedding
-        embed_layers = [nn.Linear(4, embedding_size[0]), nn.LeakyReLU(relu_slope)]
+        embed_layers = [nn.Linear(2, embedding_size[0]), nn.LeakyReLU(relu_slope)]
         for ii in range(1, len(embedding_size)):
             embed_layers.extend([nn.Linear(embedding_size[ii-1], embedding_size[ii]), nn.LeakyReLU(relu_slope)])
         self.embedding = nn.Sequential(*embed_layers)
@@ -42,13 +43,15 @@ class Generator(nn.Module):
         last_indices = [[i for i in range(bs)], (np.array(x_lengths) - 1)]
 
         # calc velocities and concat to x_in
-        x_in_vel = x_in[:, 1:] - x_in[:, :-1]
-        x_in_vel = torch.cat((x_in_vel, torch.zeros((bs, 1, 2), device=x_in.device, dtype=x_in.dtype)), dim=1)
-        last_indices_1 = [[i for i in range(bs)], (np.array(x_lengths) - 2)]
-        x_in_vel[last_indices] = x_in_vel[last_indices_1]
-        x_in_aug = torch.cat([x_in, x_in_vel], dim=2)
+        #x_in_vel = x_in[:, 1:] - x_in[:, :-1]
+        #x_in_vel = torch.from_numpy(x_in_vel)
+        #x_in_vel = torch.cat((x_in_vel, torch.zeros((bs, 1, 2), device=torch.from_numpy(x_in).device, dtype=torch.from_numpy(x_in).dtype)), dim=1)
+        #last_indices_1 = [[i for i in range(bs)], (np.array(x_lengths) - 2)]
+        #x_in_vel[last_indices] = x_in_vel[last_indices_1]
+        #x_in_aug = torch.cat([torch.from_numpy(x_in), x_in_vel], dim=2)
 
-        e_in = self.embedding(x_in_aug)
+        #e_in = self.embedding(x_in_aug)
+        e_in = self.embedding(x_in)
 
         h_init, c_init = (torch.zeros((1, bs, self.lstm_size), device=noise.device) for _ in range(2))
         lstm_out, (h_out, c_out) = self.lstm(e_in, (h_init, c_init))
@@ -62,7 +65,7 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self,  embedding_size, lstm_size, hidden_size, relu_slope):
         super(Discriminator, self).__init__()
-
+        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Embedding
         embed_layers = [nn.Linear(2, embedding_size[0]), nn.LeakyReLU(relu_slope), nn.BatchNorm1d(embedding_size[0])]
         for ii in range(1, len(embedding_size)):
@@ -91,7 +94,7 @@ class Discriminator(nn.Module):
         bs = x_in.size(0)
         T = x_in.size(1)
         e_in = self.embedding(x_in.view(-1, 2)).view(bs, T, -1)
-        e_out = self.embedding(x_out)
+        e_out = self.embedding(x_out) #TODO but here, x_out is not changed, hence it should be (128, 2)?
 
         h_init, c_init = (torch.zeros(1, bs, self.lstm_size, device=x_in.device) for _ in range(2))
         lstm_out, (h_out, c_out) = self.lstm(e_in, (h_init, c_init))
@@ -141,7 +144,7 @@ class PredictorGAN:
         self.test_data_init = []
 
     def readData(self, datasetPath):
-        dataFiles = glob.glob(datasetPath + "/*.npy")
+        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:256]
         dataArr, obsv_lengths = [], []
         num, max = 0, 0
         for dataFile in dataFiles:
@@ -210,10 +213,12 @@ class PredictorGAN:
         for u in range(self.unrolling_steps + 1):
             with torch.no_grad():
                 preds_fake = self.G(obsvs, noise, obsv_lengths)
-
+                #TODO preds_fake has a shape of (128, 2) but this should be (128, 5, 2) I believe
+                #TODO compare with line 242, preds_fake and preds have to have same shape
             fake_labels = self.D(obsvs, preds_fake, obsv_lengths)
             d_loss_fake = bce_loss(fake_labels, zeros)
 
+            #FIXME: crashed here
             real_labels = self.D(obsvs, preds, obsv_lengths)  # classify real samples
             d_loss_real = bce_loss(real_labels, ones)
             d_loss = d_loss_fake + d_loss_real
@@ -259,8 +264,8 @@ class PredictorGAN:
 
             tic = time.clock()
             for ii in range(nTrain):
-                g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(self.data['obsvs'][ii],
-                                                                     self.data['preds'][ii],
+                g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(torch.from_numpy(self.data['obsvs'][ii]).float().cuda(),
+                                                                     torch.from_numpy(self.data['preds'][ii]).float().cuda(),
                                                                      self.data['obsv_lengths'][ii])
                 g_loss += g_loss_ii
                 d_loss += d_loss_ii
@@ -292,11 +297,11 @@ class PredictorGAN:
 
 if __name__ == '__main__':
     # Read config file
-    config_file = '../config/config.yaml'
+    config_file = 'config/config.yaml'
     stream = open(config_file)
     conf = yaml.load(stream, Loader=yaml.FullLoader)
-    annotation_file = conf['Dataset']['Annotation']
-    down_sample = conf['Dataset']['DownSample']
+    #annotation_file = conf['Dataset']['Annotation']
+    #down_sample = conf['Dataset']['DownSample']
     max_observation_length = conf['Generation']['MaxObservationLength']
     #parser = BIWIParser(interval_=down_sample)
     #parser.load(annotation_file)
@@ -304,7 +309,7 @@ if __name__ == '__main__':
     logger = Logger(conf['Debug']['LogFile'])
 
     gan = PredictorGAN(conf)
-    dataset, max_observation_length, obsv_lengths = gan.readData("TrajArr/")
+    dataset, max_observation_length, obsv_lengths = gan.readData("/../TrainingData/TrajArr")
     gan.load_dataset(dataset, obsv_lengths)
     gan.load_model()
     gan.train()
