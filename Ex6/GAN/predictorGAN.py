@@ -149,19 +149,23 @@ class PredictorGAN:
         num, max = 0, 0
         for dataFile in dataFiles:
             arr = np.load(dataFile).tolist()
+            arr = np.asarray(arr).reshape((-1)).tolist()
             if len(arr) > max:
                 max = len(arr)
 
         for dataFile in dataFiles:
             num += 1
             arr = np.load(dataFile).tolist()
+            arr = np.asarray(arr).reshape((-1)).tolist()
             while len(arr) < max:
-                arr.append([arr[-1][0], arr[-1][1]])
+                arr.append(arr[len(arr) - 2])
+                arr.append(arr[-1])
             dataArr.append(arr)
             obsv_lengths.append(max)
             if num % 100 == 0:
                 print(num)
         arr = np.asarray(dataArr)
+        print(arr.shape)
         max_observation_length = max
 
         return arr, max_observation_length, obsv_lengths
