@@ -1,0 +1,2 @@
+[27/01/2021-18:44:08] [  50] MSE= 0.14335, Loss G= 29.048, Loss D= 19.241, time=1.340 s 
+[27/01/2021-18:44:08] Saving model to  /home/lda/Documents/MLCMS/Ex6/GAN/trained_models/predictor-gan.pt 

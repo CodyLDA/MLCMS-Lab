@@ -28,7 +28,7 @@ EntryPointGAN:
 
 
 PredictorGAN:
-    Checkpoint: ../trained_models/predictor-gan.pt
+    Checkpoint: trained_models/predictor-gan.pt
     EmbeddingSize:
     - 8
     - 16
@@ -43,7 +43,7 @@ PredictorGAN:
     ReluSlope: 0.1
     NoiseDim: 2
     UnrolleingSteps: 10
-    nEpochs: 2
+    nEpochs: 51
     BatchSize: 128
     LearningRateG: 0.001
     LearningRateD: 0.001

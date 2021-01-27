@@ -14,97 +14,8 @@ from torch.nn.utils.rnn import pad_sequence, pack_sequence, pack_padded_sequence
 from util.parse_utils import BIWIParser
 from util.helper import bce_loss
 from util.debug_utils import Logger
-
-
-class Generator(nn.Module):
-    def __init__(self, noise_dim, embedding_size, lstm_size, hidden_size, relu_slope):
-        super(Generator, self).__init__()
-        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-        # Embedding
-        embed_layers = [nn.Linear(2, embedding_size[0]), nn.LeakyReLU(relu_slope)]
-        for ii in range(1, len(embedding_size)):
-            embed_layers.extend([nn.Linear(embedding_size[ii-1], embedding_size[ii]), nn.LeakyReLU(relu_slope)])
-        self.embedding = nn.Sequential(*embed_layers)
-
-        # LSTM
-        self.lstm_size = lstm_size
-        self.lstm = nn.LSTM(embedding_size[-1], lstm_size, num_layers=1, batch_first=True)
-
-        # Decoder
-        fc_layers = [nn.Linear(lstm_size + noise_dim, hidden_size[0]), nn.LeakyReLU(relu_slope)]
-        for ii in range(1, len(hidden_size)):
-            fc_layers.extend([nn.Linear(hidden_size[ii-1], hidden_size[ii]), nn.LeakyReLU(relu_slope)])
-        fc_layers.append(nn.Linear(hidden_size[-1], 2))
-        self.fc = nn.Sequential(*fc_layers)
-
-    def forward(self, x_in, noise, x_lengths):
-        bs = noise.size(0)
-        last_indices = [[i for i in range(bs)], (np.array(x_lengths) - 1)]
-
-        # calc velocities and concat to x_in
-        #x_in_vel = x_in[:, 1:] - x_in[:, :-1]
-        #x_in_vel = torch.from_numpy(x_in_vel)
-        #x_in_vel = torch.cat((x_in_vel, torch.zeros((bs, 1, 2), device=torch.from_numpy(x_in).device, dtype=torch.from_numpy(x_in).dtype)), dim=1)
-        #last_indices_1 = [[i for i in range(bs)], (np.array(x_lengths) - 2)]
-        #x_in_vel[last_indices] = x_in_vel[last_indices_1]
-        #x_in_aug = torch.cat([torch.from_numpy(x_in), x_in_vel], dim=2)
-
-        #e_in = self.embedding(x_in_aug)
-        e_in = self.embedding(x_in)
-
-        h_init, c_init = (torch.zeros((1, bs, self.lstm_size), device=noise.device) for _ in range(2))
-        lstm_out, (h_out, c_out) = self.lstm(e_in, (h_init, c_init))
-        lstm_out_last = lstm_out[last_indices]
-
-        hid_vector = torch.cat((lstm_out_last, noise), dim=1)
-        x_out = self.fc(hid_vector) + x_in[last_indices]
-        return x_out
-
-
-class Discriminator(nn.Module):
-    def __init__(self,  embedding_size, lstm_size, hidden_size, relu_slope):
-        super(Discriminator, self).__init__()
-        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        # Embedding
-        embed_layers = [nn.Linear(2, embedding_size[0]), nn.LeakyReLU(relu_slope), nn.BatchNorm1d(embedding_size[0])]
-        for ii in range(1, len(embedding_size)):
-            embed_layers.extend([nn.Linear(embedding_size[ii - 1], embedding_size[ii]), nn.LeakyReLU(relu_slope)])
-        self.embedding = nn.Sequential(*embed_layers)
-
-        # LSTM
-        self.lstm_size = lstm_size
-        self.lstm = nn.LSTM(embedding_size[-1], lstm_size, num_layers=1, batch_first=True)
-
-        # Classifier
-        fc_layers = [nn.Linear(lstm_size + embedding_size[-1], hidden_size[0]), nn.LeakyReLU(relu_slope)]
-        for ii in range(1, len(hidden_size)):
-            fc_layers.extend([nn.Linear(hidden_size[ii - 1], hidden_size[ii]), nn.LeakyReLU(relu_slope)])
-        fc_layers.append(nn.Linear(hidden_size[-1], 1))
-        self.fc = nn.Sequential(*fc_layers)
-
-    def load_backup(self, backup):
-        for m_from, m_to in zip(backup.modules(), self.modules()):
-            if isinstance(m_to, nn.Linear):
-                m_to.weight.data = m_from.weight.data.clone()
-                if m_to.bias is not None:
-                    m_to.bias.data = m_from.bias.data.clone()
-
-    def forward(self, x_in, x_out, x_lengths):
-        bs = x_in.size(0)
-        T = x_in.size(1)
-        e_in = self.embedding(x_in.view(-1, 2)).view(bs, T, -1)
-        e_out = self.embedding(x_out) #TODO but here, x_out is not changed, hence it should be (128, 2)?
-
-        h_init, c_init = (torch.zeros(1, bs, self.lstm_size, device=x_in.device) for _ in range(2))
-        lstm_out, (h_out, c_out) = self.lstm(e_in, (h_init, c_init))
-        inds = [[i for i in range(bs)], (np.array(x_lengths) - 1)]
-        lstm_out_last = lstm_out[inds]
-
-        hid_vector = torch.cat((lstm_out_last, e_out), dim=1)
-        x_out = self.fc(hid_vector)
-        return x_out
-
+from generator import Generator
+from discriminator import Discriminator
 
 class PredictorGAN:
     def __init__(self, config):
@@ -144,7 +55,7 @@ class PredictorGAN:
         self.test_data_init = []
 
     def readData(self, datasetPath):
-        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:256]
+        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:128*5]
         dataArr, obsv_lengths = [], []
         num, max = 0, 0
         for dataFile in dataFiles:
@@ -170,10 +81,19 @@ class PredictorGAN:
 
         return arr, max_observation_length, obsv_lengths
 
-    def load_dataset(self, dataset, obsv_lengths):
+    def load_dataset(self, dataset, max_obsv_len):
+        continuation_data_obsv = []
+        obsv_lengths = []
+        continuation_data_pred = []
+        for ii, Pi in enumerate(dataset):
+            for tt in range(1, len(Pi)):
+                x_obsv_t = Pi[max(0, tt - max_obsv_len):tt]
+                obsv_lengths.append(len(x_obsv_t))
+                continuation_data_obsv.append(torch.FloatTensor(x_obsv_t))
+                continuation_data_pred.append(torch.FloatTensor(Pi[tt]))
 
-        continuation_data_pred = dataset
-        continuation_data_obsv = dataset
+        continuation_data_pred = torch.stack(continuation_data_pred, dim=0).cuda()
+        continuation_data_obsv = pad_sequence(continuation_data_obsv, batch_first=True).cuda()
 
         self.n_data = len(continuation_data_pred)
         self.n_batches = int(np.ceil(self.n_data / self.batch_size))
@@ -182,6 +102,17 @@ class PredictorGAN:
             self.data['obsvs'].append(continuation_data_obsv[bi * bs:min((bi + 1) * bs, self.n_data)])
             self.data['obsv_lengths'].append(obsv_lengths[bi * bs:min((bi + 1) * bs, self.n_data)])
             self.data['preds'].append(continuation_data_pred[bi * bs:min((bi + 1) * bs, self.n_data)])
+
+        # continuation_data_pred = dataset
+        # continuation_data_obsv = dataset
+        #
+        # self.n_data = len(continuation_data_pred)
+        # self.n_batches = int(np.ceil(self.n_data / self.batch_size))
+        # bs = self.batch_size
+        # for bi in range(self.n_batches):
+        #     self.data['obsvs'].append(continuation_data_obsv[bi * bs:min((bi + 1) * bs, self.n_data)])
+        #     self.data['obsv_lengths'].append(obsv_lengths[bi * bs:min((bi + 1) * bs, self.n_data)])
+        #     self.data['preds'].append(continuation_data_pred[bi * bs:min((bi + 1) * bs, self.n_data)])
 
     def save(self, checkpoints, epoch):
         logger.print_me('Saving model to ', checkpoints)
@@ -194,8 +125,8 @@ class PredictorGAN:
         }, checkpoints)
 
     def load_model(self, checkpoints=''):
-        if not checkpoints:
-            checkpoints = self.checkpoints
+        #if not checkpoints:
+        #    checkpoints = self.checkpoints
         epoch = 1
         if os.path.isfile(checkpoints):
             print('loading from ' + checkpoints)
@@ -205,6 +136,9 @@ class PredictorGAN:
             self.D.load_state_dict(checkpoint['D_dict'])
             self.G_optimizer.load_state_dict(checkpoint['G_optimizer'])
             self.D_optimizer.load_state_dict(checkpoint['D_optimizer'])
+        else:
+            f = open(checkpoints, "x")
+            f.close()
         return epoch
 
     def batch_train(self, obsvs, preds, obsv_lengths):
@@ -268,8 +202,11 @@ class PredictorGAN:
 
             tic = time.clock()
             for ii in range(nTrain):
-                g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(torch.from_numpy(self.data['obsvs'][ii]).float().cuda(),
-                                                                     torch.from_numpy(self.data['preds'][ii]).float().cuda(),
+                #g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(torch.from_numpy(self.data['obsvs'][ii]).float().cuda(),
+                #                                                     torch.from_numpy(self.data['preds'][ii]).float().cuda(),
+                #                                                     self.data['obsv_lengths'][ii])
+                g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(self.data['obsvs'][ii],
+                                                                     self.data['preds'][ii],
                                                                      self.data['obsv_lengths'][ii])
                 g_loss += g_loss_ii
                 d_loss += d_loss_ii
@@ -314,6 +251,7 @@ if __name__ == '__main__':
 
     gan = PredictorGAN(conf)
     dataset, max_observation_length, obsv_lengths = gan.readData("/../TrainingData/TrajArr")
-    gan.load_dataset(dataset, obsv_lengths)
-    gan.load_model()
+    gan.load_dataset(dataset, max(obsv_lengths))
+    #gan.load_model(os.path.dirname(__file__) + '/' + conf['PredictorGAN']['Checkpoint'])
+    gan.checkpoints = os.path.dirname(__file__) + '/' + conf['PredictorGAN']['Checkpoint']
     gan.train()
