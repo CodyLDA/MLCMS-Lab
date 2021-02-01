@@ -55,7 +55,7 @@ class TrajectoryGAN:
         self.start_epoch = 1
 
     def readData(self, datasetPath, training=True):
-        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:128*8]
+        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")
         training_test_split = int(9 / 10 * len(dataFiles))
         if not training:
             dataFiles = dataFiles[training_test_split:]
@@ -225,18 +225,18 @@ if __name__ == '__main__':
     # gan.load_model(os.path.dirname(__file__) + '/' + conf['TrajectoryGAN']['SavingPoint'])
     # gan.saving_point = os.path.dirname(__file__) + '/' + conf['TrajectoryGAN']['SavingPoint']
 
-    training = False
+    training = True
 
     if training:
         logger = Logger(conf['Logger'])
         # Train
-        gan.load_dataset("/../TrainingData/TrajArr")
+        gan.load_dataset("/../TrainingData_v2.0/TrajArr")
         gan.load_model(conf['TrajectoryGAN']['SavingPoint'], True)
         gan.train()
     else:
         # Generate
         gan.load_model(conf['TrajectoryGAN']['SavingPoint'])
-        data, steps = gan.readData("/../TrainingData/TrajArr", False)
+        data, steps = gan.readData("/../TrainingData_v2.0/TrajArr", False)
         data = data[:20, :, :]
         n_samples = len(data)
         data_start = data[-n_samples:, 0, :]
