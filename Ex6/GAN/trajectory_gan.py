@@ -2,13 +2,11 @@ import os
 import yaml
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
 import torch
 import glob
 import torch.nn as nn
 import torch.optim as opt
 import torch.nn.functional as F
-from torch.autograd import Variable
 from torch.nn.utils.rnn import pad_sequence
 from util.helper import bce_loss
 from util.debug_utils import Logger
@@ -18,11 +16,11 @@ from discriminator import Discriminator
 
 
 class TrajectoryGAN:
-
     def __init__(self, config):
-        self.noise_dim = config['TrajectoryGAN']['BaseDistrDim']
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self.base_distr_dim = config['TrajectoryGAN']['BaseDistrDim']
         self.num_epochs = config['TrajectoryGAN']['NumEpoch']
-        self.saving_point = config['TrajectoryGAN']['SavingPoint']
 
         # The hyperparameters
         self.improved_steps = config['TrajectoryGAN']['ImprovedDiscriminator']
@@ -42,176 +40,155 @@ class TrajectoryGAN:
 
         self.batch_size = config['TrajectoryGAN']['BatchSize']
 
-        self.G = Generator(self.noise_dim, embedding_config, generator_lstm_hidden, generator_fc_hidden, leaky_relu_slope).cuda()
-        self.D = Discriminator(embedding_config, discriminator_lstm_hidden, discriminator_fc_hidden, leaky_relu_slope).cuda()
+        self.G = Generator(self.base_distr_dim, embedding_config, generator_lstm_hidden,
+                           generator_fc_hidden, leaky_relu_slope, self.device).to(self.device)
+        self.D = Discriminator(embedding_config, discriminator_lstm_hidden,
+                               discriminator_fc_hidden, leaky_relu_slope, self.device).to(self.device)
         self.G_optimizer = opt.Adam(self.G.parameters(), lr=generator_learning_rate, betas=(beta_1, beta_2))
         self.D_optimizer = opt.Adam(self.D.parameters(), lr=discriminator_learning_rate, betas=(beta_1, beta_2))
         self.mse_loss = nn.MSELoss()
 
-        self.data = {'obsvs': [], 'obsv_lengths': [], 'preds': []}
-        self.n_data = 0
-        self.n_batches = 0
-        self.test_data_init = []
-        self.start_epoch = 1
+        self.data = {'real_traj': [], 'traj_lengths': [], 'prediction': []}
+        self.num_data, self.num_batches, self.start_epoch = 0, 0, 1
 
-    def readData(self, datasetPath, training=True):
-        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:128*10]
-        training_test_split = int(9 / 10 * len(dataFiles))
-        if not training:
-            dataFiles = dataFiles[training_test_split:]
+    def read_data(self, dataset_path, training_data=True):
+        data_files = glob.glob(os.path.dirname(__file__) + dataset_path + "/*.npy")
+        training_test_split = int(9 / 10 * len(data_files))
+        if not training_data:
+            data_files = data_files[training_test_split:]
         else:
-            dataFiles = dataFiles[:training_test_split]
-        dataArr, obsv_lengths = [], []
-        num, max = 0, 0
-        for dataFile in dataFiles:
-            arr = np.load(dataFile).tolist()
-            if len(arr) > max:
-                max = len(arr)
+            data_files = data_files[:training_test_split]
+        dataArr = []
+        num, max_traj_length = 0, 0
+        for dataFile in data_files:
+            file_content = list(np.load(dataFile))
+            max_traj_length = len(file_content) if len(file_content) > max_traj_length else max_traj_length
 
-        for dataFile in dataFiles:
+        for dataFile in data_files:
             num += 1
-            arr = np.load(dataFile).tolist()
-            while len(arr) < max:
-                arr.append([arr[-1][0], arr[-1][1]])
-            dataArr.append(arr)
-            obsv_lengths.append(max)
+            file_content = list(np.load(dataFile))
+            while len(file_content) < max_traj_length:
+                file_content.append([file_content[-1][0], file_content[-1][1]])
+            dataArr.append(file_content)
             if num % 100 == 0:
                 print(f'loaded {num} data points')
-        arr = np.asarray(dataArr)
-        print(arr.shape)
-        max_observation_length = max
+        loaded_data = np.asarray(dataArr)
 
-        return arr, max_observation_length
+        return loaded_data, max_traj_length
 
-    def load_dataset(self, datasetPath):
-        dataset, max_obs_len = self.readData(datasetPath)
-        continuation_data_obsv = []
-        obsv_lengths = []
-        continuation_data_pred = []
-        for ii, Pi in enumerate(dataset):
-            for tt in range(1, len(Pi)):
-                x_obsv_t = Pi[max(0, tt - max_obs_len):tt]
-                obsv_lengths.append(len(x_obsv_t))
-                continuation_data_obsv.append(torch.FloatTensor(x_obsv_t))
-                continuation_data_pred.append(torch.FloatTensor(Pi[tt]))
+    def load_dataset(self, dataset_path):
+        dataset, max_traj_length = self.read_data(dataset_path)
+        step_by_step_traj, traj_lengths, next_step_predictions = [], [], []
+        for index, traj in enumerate(dataset):
+            for step in range(1, len(traj)):
+                step_by_step_traj.append(torch.tensor(traj[:step]).float())
+                next_step_predictions.append(torch.tensor(traj[step]).float())
+                traj_lengths.append(step)
 
-        continuation_data_pred = torch.stack(continuation_data_pred, dim=0).cuda()
-        continuation_data_obsv = pad_sequence(continuation_data_obsv, batch_first=True).cuda()
+        next_step_predictions = torch.stack(next_step_predictions, dim=0).to(self.device)
+        step_by_step_traj = pad_sequence(step_by_step_traj, batch_first=True).to(self.device)
 
-        self.n_data = len(continuation_data_pred)
-        self.n_batches = int(np.ceil(self.n_data / self.batch_size))
-        bs = self.batch_size
-        for bi in range(self.n_batches):
-            self.data['obsvs'].append(continuation_data_obsv[bi * bs:min((bi + 1) * bs, self.n_data)])
-            self.data['obsv_lengths'].append(obsv_lengths[bi * bs:min((bi + 1) * bs, self.n_data)])
-            self.data['preds'].append(continuation_data_pred[bi * bs:min((bi + 1) * bs, self.n_data)])
+        self.num_data = len(next_step_predictions)
+        self.num_batches = int(np.ceil(self.num_data / self.batch_size))
+        batch_size = self.batch_size
+        for batch_index in range(self.num_batches):
+            self.data['real_traj'].append(step_by_step_traj[batch_index * batch_size:
+                                                            min((batch_index + 1) * batch_size, self.num_data)])
+            self.data['traj_lengths'].append(traj_lengths[batch_index * batch_size:
+                                                          min((batch_index + 1) * batch_size, self.num_data)])
+            self.data['prediction'].append(next_step_predictions[batch_index * batch_size:
+                                                                 min((batch_index + 1) * batch_size, self.num_data)])
 
-    def save(self, saving_point, epoch):
-        save_to = f'{os.path.dirname(__file__)}/{saving_point}_{epoch}.pt'
-        f = open(save_to, "x")
-        f.close()
-        logger.print_me('Saving model to ', save_to)
+    def load_model(self, saving_path):
+        self.start_epoch = 1
+        assert os.path.isfile(saving_path), f'No model under {saving_path} found!'
+        print('Load model from ' + saving_path)
+        save_point = torch.load(saving_path, map_location=self.device)
+        self.start_epoch = save_point['epoch'] + 1
+        self.G.load_state_dict(save_point['G_dict'])
+        self.D.load_state_dict(save_point['D_dict'])
+        self.G_optimizer.load_state_dict(save_point['G_optimizer'])
+        self.D_optimizer.load_state_dict(save_point['D_optimizer'])
+
+    def save_model(self, saving_path, model_name, epoch):
+        saving_path_name = f'{saving_path}/{model_name}_{epoch}.pt'
+        with open(saving_path_name, 'w') as f:
+            pass
+        logger.print_me('Saving model to ', saving_path_name)
         torch.save({
             'epoch': epoch,
             'G_dict': self.G.state_dict(),
             'D_dict': self.D.state_dict(),
             'G_optimizer': self.G_optimizer.state_dict(),
             'D_optimizer': self.D_optimizer.state_dict()
-        }, save_to)
+        }, saving_path_name)
 
-    def load_model(self, saving_point='', overwrite=False):
-        self.saving_point = os.path.dirname(__file__) + '/' + saving_point
-        self.start_epoch = 1
-        if os.path.isfile(saving_point):
-            if overwrite:
-                f = open(saving_point, "w")
-                f.close()
-                return None
-            print('loading from ' + saving_point)
-            checkpoint = torch.load(saving_point)
-            self.start_epoch = checkpoint['epoch'] + 1
-            self.G.load_state_dict(checkpoint['G_dict'])
-            self.D.load_state_dict(checkpoint['D_dict'])
-            self.G_optimizer.load_state_dict(checkpoint['G_optimizer'])
-            self.D_optimizer.load_state_dict(checkpoint['D_optimizer'])
-        else:
-            f = open(saving_point, "x")
-            f.close()
+    def train_batch(self, real_traj, prediction, traj_lengths):
+        batch_size = len(prediction)
 
-    def batch_train(self, obsvs, preds, obsv_lengths):
-        bs = len(preds)
+        zeros = torch.zeros(batch_size, 1).to(self.device)
+        ones = torch.ones(batch_size, 1).to(self.device)
+        base_distr = torch.rand(batch_size, self.base_distr_dim).float().to(self.device)
+        zeros.requires_grad, ones.requires_grad, base_distr.requires_grad = False, False, False
+
         self.D_optimizer.zero_grad()
-        zeros = Variable(torch.zeros(bs, 1) + np.random.uniform(0, 0.05), requires_grad=False).cuda()
-        ones = Variable(torch.ones(bs, 1) * np.random.uniform(0.95, 1.0), requires_grad=False).cuda()
-        noise = Variable(torch.FloatTensor(torch.rand(bs, self.noise_dim)), requires_grad=False).cuda()  # uniform
-
-        for u in range(self.improved_steps + 1):
+        for improvement in range(self.improved_steps + 1):
             with torch.no_grad():
-                preds_fake = self.G(obsvs, noise, obsv_lengths)
-            fake_labels = self.D(obsvs, preds_fake, obsv_lengths)
-            d_loss_fake = bce_loss(fake_labels, zeros)
+                prediction_fake = self.G(real_traj, base_distr, traj_lengths)
 
-            real_labels = self.D(obsvs, preds, obsv_lengths)  # classify real samples
-            d_loss_real = bce_loss(real_labels, ones)
-            d_loss = d_loss_fake + d_loss_real
-            d_loss.backward()  # update D
+            fake_labels = self.D(real_traj, prediction_fake, traj_lengths)
+            d_loss = bce_loss(fake_labels, zeros)
+
+            real_labels = self.D(real_traj, prediction, traj_lengths)
+            d_loss += bce_loss(real_labels, ones)
+
+            d_loss.backward()
             self.D_optimizer.step()
 
-            if u == 0 and self.improved_steps > 0:
-                backup = copy.deepcopy(self.D)
-
-        # =============== Train Generator ================= #
         self.G_optimizer.zero_grad()
         self.D_optimizer.zero_grad()
 
-        preds_fake = self.G(obsvs, noise, obsv_lengths)
+        prediction_fake = self.G(real_traj, base_distr, traj_lengths)
 
-        fake_labels = self.D(obsvs, preds_fake, obsv_lengths)
-        g_loss_fooling = bce_loss(fake_labels, ones)
-        g_loss = g_loss_fooling
-
-        mse_loss = F.mse_loss(preds_fake, preds)
-        g_loss += 100 * mse_loss
+        fake_labels = self.D(real_traj, prediction_fake, traj_lengths)
+        g_loss = bce_loss(fake_labels, ones)
+        mse_loss = 100 * F.mse_loss(prediction_fake, prediction)
+        g_loss += mse_loss
 
         g_loss.backward()
         self.G_optimizer.step()
 
-        if self.improved_steps > 0:
-            self.D.load_backup(backup)
-            del backup
-
         return g_loss.item(), d_loss.item(), mse_loss.item()
 
-    def train(self):
-        # TODO: separate train and test
-        nTrain = self.n_batches * 4 // 5
-        nTest = self.n_batches - nTrain
-
+    def train(self, saving_path, model_name):
         for epoch in range(self.start_epoch, self.num_epochs):
             g_loss, d_loss, mse_loss = 0, 0, 0
 
             tic = process_time()
-            for ii in range(nTrain):
-                g_loss_ii, d_loss_ii, mse_loss_ii = self.batch_train(self.data['obsvs'][ii],
-                                                                     self.data['preds'][ii],
-                                                                     self.data['obsv_lengths'][ii])
-                g_loss += g_loss_ii
-                d_loss += d_loss_ii
-                mse_loss += mse_loss_ii
+            for index in range(self.num_batches):
+                g_loss_index, d_loss_index, mse_loss_index = self.train_batch(self.data['real_traj'][index],
+                                                                              self.data['prediction'][index],
+                                                                              self.data['traj_lengths'][index])
+                g_loss += g_loss_index
+                d_loss += d_loss_index
+                mse_loss += mse_loss_index
             toc = process_time()
+
             logger.print_me(f'#{epoch:5d} | MSE = {mse_loss:.5f} | Loss G = {g_loss:.4f} '
                             f'| Loss D = {d_loss:.4f} | time = {toc - tic:.2f} s')
-            if epoch % 50 == 0:  # FIXME : set the interval for running tests
-                #logger.print_me(f'#{epoch:5d} | MSE = {mse_loss:.5f} | Loss G = {g_loss:.4f} '
-                #                f'| Loss D = {d_loss:.4f} | time = {toc - tic:.2f} s')
-                self.save(self.saving_point, epoch)
 
-    def generate(self, starting_points, n_samples, n_step):
-        past_traj = starting_points.data.unsqueeze(1).cuda()
+            if epoch % 50 == 0:
+                self.save_model(saving_path, model_name, epoch)
+
+    def generate(self, starting_points, n_step):
+        past_traj = starting_points.data.unsqueeze(1).to(self.device)
+        num_samples = starting_points.shape[0]
 
         for step in range(1, n_step + 1):
-            noise = Variable(torch.FloatTensor(torch.rand(n_samples, self.noise_dim)), requires_grad=False).cuda()
-            next_step = self.G(past_traj, noise, [step] * n_samples)
+            base_distr = torch.rand(num_samples, self.base_distr_dim).float().to(self.device)
+            base_distr.requires_grad = False
+
+            next_step = self.G(past_traj, base_distr, [step] * num_samples)
             past_traj = torch.cat([past_traj, next_step.data.unsqueeze(1)], dim=1)
 
         return past_traj.cpu().numpy()
@@ -220,33 +197,30 @@ class TrajectoryGAN:
 if __name__ == '__main__':
     # Read config file
     config_file = 'config/config.yaml'
-    stream = open(config_file)
-    conf = yaml.load(stream, Loader=yaml.FullLoader)
+    f = open(config_file)
+    conf = yaml.load(f, Loader=yaml.FullLoader)
+
+    saving_path = os.path.dirname(__file__) + '/' + conf['TrajectoryGAN']['SavingPath']
+    model_name = conf['TrajectoryGAN']['ModelName']
 
     gan = TrajectoryGAN(conf)
-    #dataset, max_observation_length, obsv_lengths = gan.readData("/../TrainingData/TrajArr")
-    # gan.load_model(os.path.dirname(__file__) + '/' + conf['TrajectoryGAN']['SavingPoint'])
-    # gan.saving_point = os.path.dirname(__file__) + '/' + conf['TrajectoryGAN']['SavingPoint']
 
-    training = True
+    training = conf['TrajectoryGAN']['Train']
 
     if training:
-        logger = Logger(conf['Logger'])
+        logger = Logger(f'{conf["Logger"]}_{model_name}.txt')
         # Train
-        gan.load_dataset("/../TrainingData_v2.0/TrajArr")
-        gan.saving_point = conf['TrajectoryGAN']['SavingPoint'][:-3]
-        #gan.load_model(conf['TrajectoryGAN']['SavingPoint'], True)
-        gan.train()
+        gan.load_dataset(conf['DatasetPath'])
+        gan.train(saving_path, model_name)
     else:
         # Generate
-        gan.load_model(conf['TrajectoryGAN']['SavingPoint'])
-        data, steps = gan.readData("/../TrainingData_v2.0/TrajArr", False)
+        gan.load_model(f"{saving_path}/{conf['TrajectoryGAN']['ModelName']}.pt")
+        data, steps = gan.read_data(conf['DatasetPath'], False)
         data = data[:20, :, :]
         n_samples = len(data)
         data_start = data[-n_samples:, 0, :]
         data = data[-n_samples:, :, :]
-        #trajectories = gan.generate(torch.FloatTensor([[3, 2], [4, 3], [2, 2]]), n_samples, 5)
-        trajectories = gan.generate(torch.from_numpy(data_start).float().cuda(), n_samples, steps)
+        trajectories = gan.generate(torch.from_numpy(data_start).float(), steps)
 
         fig, ax = plt.subplots(2)
         for i in range(n_samples):

@@ -4,46 +4,36 @@ import torch.nn as nn
 
 
 class Generator(nn.Module):
-    def __init__(self, noise_dim, embedding_size, lstm_size, hidden_size, relu_slope):
+    def __init__(self, base_distr_dim, embedding_config, generator_lstm_hidden,
+                 generator_fc_hidden, leaky_relu_slope, device):
         super(Generator, self).__init__()
-        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
-        # Embedding
-        embed_layers = [nn.Linear(2, embedding_size[0]), nn.LeakyReLU(relu_slope)]
-        for ii in range(1, len(embedding_size)):
-            embed_layers.extend([nn.Linear(embedding_size[ii-1], embedding_size[ii]), nn.LeakyReLU(relu_slope)])
-        self.embedding = nn.Sequential(*embed_layers)
+        representation = [nn.Linear(2, embedding_config[0]), nn.LeakyReLU(leaky_relu_slope)]
+        for layer_id in range(1, len(embedding_config)):
+            representation.extend([nn.Linear(embedding_config[layer_id-1], embedding_config[layer_id]),
+                                   nn.LeakyReLU(leaky_relu_slope)])
+        self.embedding = nn.Sequential(*representation)
 
-        # LSTM
-        self.lstm_size = lstm_size
-        self.lstm = nn.LSTM(embedding_size[-1], lstm_size, num_layers=1, batch_first=True)
+        self.generator_lstm_hidden = generator_lstm_hidden
+        self.lstm = nn.LSTM(embedding_config[-1], generator_lstm_hidden, batch_first=True)
 
-        # Decoder
-        fc_layers = [nn.Linear(lstm_size + noise_dim, hidden_size[0]), nn.LeakyReLU(relu_slope)]
-        for ii in range(1, len(hidden_size)):
-            fc_layers.extend([nn.Linear(hidden_size[ii-1], hidden_size[ii]), nn.LeakyReLU(relu_slope)])
-        fc_layers.append(nn.Linear(hidden_size[-1], 2))
-        self.fc = nn.Sequential(*fc_layers)
+        fc_block = [nn.Linear(generator_lstm_hidden + base_distr_dim, generator_fc_hidden[0]),
+                     nn.LeakyReLU(leaky_relu_slope)]
+        for layer_id in range(1, len(generator_fc_hidden)):
+            fc_block.extend([nn.Linear(generator_fc_hidden[layer_id-1], generator_fc_hidden[layer_id]),
+                             nn.LeakyReLU(leaky_relu_slope)])
+        fc_block.append(nn.Linear(generator_fc_hidden[-1], 2))
+        self.fc = nn.Sequential(*fc_block)
 
-    def forward(self, x_in, noise, x_lengths):
-        bs = noise.size(0)
-        last_indices = [[i for i in range(bs)], (np.array(x_lengths) - 1)]
+    def forward(self, trajectory, base_distr, traj_lengths):
+        batch_size = trajectory.shape[0]
+        last_indices = [[i for i in range(batch_size)], (np.array(traj_lengths) - 1)]
 
-        # calc velocities and concat to x_in
-        #x_in_vel = x_in[:, 1:] - x_in[:, :-1]
-        #x_in_vel = torch.from_numpy(x_in_vel)
-        #x_in_vel = torch.cat((x_in_vel, torch.zeros((bs, 1, 2), device=torch.from_numpy(x_in).device, dtype=torch.from_numpy(x_in).dtype)), dim=1)
-        #last_indices_1 = [[i for i in range(bs)], (np.array(x_lengths) - 2)]
-        #x_in_vel[last_indices] = x_in_vel[last_indices_1]
-        #x_in_aug = torch.cat([torch.from_numpy(x_in), x_in_vel], dim=2)
-
-        #e_in = self.embedding(x_in_aug)
-        e_in = self.embedding(x_in)
-
-        h_init, c_init = (torch.zeros((1, bs, self.lstm_size), device=noise.device) for _ in range(2))
-        lstm_out, (h_out, c_out) = self.lstm(e_in, (h_init, c_init))
+        h_init, c_init = (torch.zeros((1, batch_size, self.generator_lstm_hidden)).to(self.device) for _ in range(2))
+        lstm_out, _ = self.lstm(self.embedding(trajectory), (h_init, c_init))
         lstm_out_last = lstm_out[last_indices]
 
-        hid_vector = torch.cat((lstm_out_last, noise), dim=1)
-        x_out = self.fc(hid_vector) + x_in[last_indices]
-        return x_out
+        lstm_aug = torch.cat((lstm_out_last, base_distr), dim=1)
+        next_step = self.fc(lstm_aug) + trajectory[last_indices]
+        return next_step
