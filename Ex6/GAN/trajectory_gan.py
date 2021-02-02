@@ -55,7 +55,7 @@ class TrajectoryGAN:
         self.start_epoch = 1
 
     def readData(self, datasetPath, training=True):
-        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")
+        dataFiles = glob.glob(os.path.dirname(__file__) + datasetPath + "/*.npy")[:128*10]
         training_test_split = int(9 / 10 * len(dataFiles))
         if not training:
             dataFiles = dataFiles[training_test_split:]
@@ -107,14 +107,17 @@ class TrajectoryGAN:
             self.data['preds'].append(continuation_data_pred[bi * bs:min((bi + 1) * bs, self.n_data)])
 
     def save(self, saving_point, epoch):
-        logger.print_me('Saving model to ', saving_point)
+        save_to = f'{os.path.dirname(__file__)}/{saving_point}_{epoch}.pt'
+        f = open(save_to, "x")
+        f.close()
+        logger.print_me('Saving model to ', save_to)
         torch.save({
             'epoch': epoch,
             'G_dict': self.G.state_dict(),
             'D_dict': self.D.state_dict(),
             'G_optimizer': self.G_optimizer.state_dict(),
             'D_optimizer': self.D_optimizer.state_dict()
-        }, saving_point)
+        }, save_to)
 
     def load_model(self, saving_point='', overwrite=False):
         self.saving_point = os.path.dirname(__file__) + '/' + saving_point
@@ -231,7 +234,8 @@ if __name__ == '__main__':
         logger = Logger(conf['Logger'])
         # Train
         gan.load_dataset("/../TrainingData_v2.0/TrajArr")
-        gan.load_model(conf['TrajectoryGAN']['SavingPoint'], True)
+        gan.saving_point = conf['TrajectoryGAN']['SavingPoint'][:-3]
+        #gan.load_model(conf['TrajectoryGAN']['SavingPoint'], True)
         gan.train()
     else:
         # Generate

@@ -1,19 +1,6 @@
-import os
-import time
-import yaml
 import numpy as np
-import matplotlib.pyplot as plt
-import copy
 import torch
-import glob
 import torch.nn as nn
-import torch.optim as opt
-import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn.utils.rnn import pad_sequence, pack_sequence, pack_padded_sequence, pad_packed_sequence
-from util.parse_utils import BIWIParser
-from util.helper import bce_loss
-from util.debug_utils import Logger
 
 
 class Generator(nn.Module):
