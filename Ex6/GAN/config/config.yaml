@@ -1,5 +1,6 @@
 TrajectoryGAN:
-    SavingPoint: trained_models/trajectory-gan.pt
+    SavingPath: trained_models
+    ModelName: trajectory_gan
     Embedding:
     - 8
     - 16
@@ -14,11 +15,13 @@ TrajectoryGAN:
     LeakyRelu: 0.1
     BaseDistrDim: 2
     ImprovedDiscriminator: 10
-    NumEpoch: 2001
+    NumEpoch: 1001
     BatchSize: 128
     GeneratorLearning: 0.001
     DiscriminatorLearning: 0.001
     Beta1: 0.9
     Beta2: 0.999
+    Train: True
 
-Logger: /../debug/log.txt
+Logger: /../debug/log
+DatasetPath: /../TrainingData_v2.0/TrajArr
