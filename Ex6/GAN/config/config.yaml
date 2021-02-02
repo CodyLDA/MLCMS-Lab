@@ -1,5 +1,5 @@
 TrajectoryGAN:
-    SavingPoint: trained_models/trajectory-gan.pt
+    SavingPoint: trained_models/LargeDataset/trajectory-gan_400.pt
     Embedding:
     - 8
     - 16
