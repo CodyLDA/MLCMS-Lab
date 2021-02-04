@@ -2,12 +2,12 @@ import glob
 import numpy
 from numpy import save
 
+# Go through the output files from the simulated data
 outputs = glob.glob("OutputFiles/*")
 for output in outputs:
-    print(output)
+    # Read the output file
     simFile = output+"\\postvis.traj"
     data = numpy.loadtxt(simFile, skiprows=1).reshape(-1,8)
-    print(data)
     if data.size == 0:
         pass
     else:
@@ -18,6 +18,6 @@ for output in outputs:
             pedesPath.append([data[i,5], data[i,6]])
         arr = numpy.array(pedesPath)
         output = output.replace("OutputFiles\\", "")
+        # Save the trajectory array
         path = "TrajArr/"+output+".npy"
-        print(path)
         save(path, arr)
