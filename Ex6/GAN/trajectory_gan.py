@@ -180,17 +180,18 @@ class TrajectoryGAN:
             if epoch % 50 == 0:
                 self.save_model(saving_path, model_name, epoch)
 
-    def generate(self, starting_points, n_step):
+    def generate(self, starting_points, num_step):
         past_traj = starting_points.data.unsqueeze(1).to(self.device)
         num_samples = starting_points.shape[0]
 
-        for step in range(1, n_step + 1):
+        for step in range(1, num_step + 1):
             base_distr = torch.rand(num_samples, self.base_distr_dim).float().to(self.device)
             base_distr.requires_grad = False
 
             next_step = self.G(past_traj, base_distr, [step] * num_samples)
             past_traj = torch.cat([past_traj, next_step.data.unsqueeze(1)], dim=1)
 
+        print(f'Generated {num_samples} new trajectories of length {num_step}.')
         return past_traj.cpu().numpy()
 
 

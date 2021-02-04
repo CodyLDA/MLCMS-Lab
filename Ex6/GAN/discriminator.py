@@ -27,7 +27,7 @@ class Discriminator(nn.Module):
         self.fc = nn.Sequential(*fc_block)
 
     def forward(self, trajectory, real_fake_pred, traj_lengths):
-        batch_size = trajectory.size(0)
+        batch_size = trajectory.shape[0]
         last_indices = [[i for i in range(batch_size)], (np.array(traj_lengths) - 1)]
 
         embedded_traj = self.embedding(trajectory.view(-1, 2)).view(batch_size, trajectory.size(1), -1)
