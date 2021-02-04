@@ -1,5 +1,4 @@
 import os.path
-import yaml
 from datetime import datetime
 
 
@@ -11,10 +10,6 @@ class Logger:
         if not log_filename:
             print('Error: Invalid address for log file')
             return
-        log_filename_ = open(os.path.dirname(__file__) + '/../debug/log.txt')
-        # conf = yaml.load(stream, Loader=yaml.FullLoader)
-        # log_filename_ = conf['Debug']['LogFile']
-        # log_filename_ = os.path.abspath(os.path.join(os.path.dirname(config_file), log_filename_))
 
         open_mode = "a+"
         if not os.path.exists(log_filename):
@@ -35,11 +30,3 @@ class Logger:
         if self.counter_for_flush > 10:
             self.log.flush()
             self.counter_for_flush = 0
-
-
-# Test
-if __name__ == '__main__':
-    import numpy as np
-    logger = Logger('../../config/config.yaml')
-    logger.print_me('printme', 1.0)
-    logger.print_me(np.eye(2))
