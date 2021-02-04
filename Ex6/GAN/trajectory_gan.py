@@ -13,7 +13,7 @@ from util.debug_utils import Logger
 import matplotlib.pyplot as plt
 from generator import Generator
 from discriminator import Discriminator
-
+import optuna
 
 class TrajectoryGAN:
     def __init__(self, config):
@@ -49,16 +49,16 @@ class TrajectoryGAN:
         leaky_relu_slope = config['TrajectoryGAN']['LeakyRelu']
 
         # optimizer parameters
-        beta_1 = config['TrajectoryGAN']['Beta1']
-        beta_2 = config['TrajectoryGAN']['Beta2']
+        self.beta_1 = config['TrajectoryGAN']['Beta1']
+        self.beta_2 = config['TrajectoryGAN']['Beta2']
 
         # setting up the architecture objects
         self.G = Generator(self.base_distr_dim, embedding_config, generator_lstm_hidden,
                            generator_fc_hidden, leaky_relu_slope, self.device).to(self.device)
         self.D = Discriminator(embedding_config, discriminator_lstm_hidden,
                                discriminator_fc_hidden, leaky_relu_slope, self.device).to(self.device)
-        self.G_optimizer = opt.Adam(self.G.parameters(), lr=generator_learning_rate, betas=(beta_1, beta_2))
-        self.D_optimizer = opt.Adam(self.D.parameters(), lr=discriminator_learning_rate, betas=(beta_1, beta_2))
+        self.G_optimizer = opt.Adam(self.G.parameters(), lr=generator_learning_rate, betas=(self.beta_1, self.beta_2))
+        self.D_optimizer = opt.Adam(self.D.parameters(), lr=discriminator_learning_rate, betas=(self.beta_1, self.beta_2))
         self.mse_loss = nn.MSELoss()
 
         self.data = {'real_traj': [], 'traj_lengths': [], 'prediction': []}
@@ -253,7 +253,31 @@ class TrajectoryGAN:
 
         return g_loss.item(), d_loss.item(), mse_loss.item()
 
-    def train(self, saving_path, model_name):
+    def objective(self,trial,saving_path, model_name):
+        """
+        Objective function for hyperparameter tuning using optuna. Wrapper function around train.
+
+        Parameters
+        ----------
+        saving_path: string, path to save the model
+        model_name: string, name of the model that was trained
+        trail: object to set hyperparameter values 
+
+        Returns
+        -------
+        """
+
+        # The hyperparameters to tune
+        generator_learning_rate = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+
+        discriminator_learning_rate = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+
+        self.G_optimizer = opt.Adam(self.G.parameters(), lr=generator_learning_rate, betas=(self.beta_1, self.beta_2))
+        self.D_optimizer = opt.Adam(self.D.parameters(), lr=discriminator_learning_rate, betas=(self.beta_1, self.beta_2))
+        
+        gan.train( saving_path, model_name, trial)
+
+    def train(self, saving_path, model_name, trial=None):
         """
         Begin training of a model given a saving path for the model and a model name under which name
         the model should be saved
@@ -262,6 +286,7 @@ class TrajectoryGAN:
         ----------
         saving_path: string, path to save the model
         model_name: string, name of the model that was trained
+        trail: object to set hyperparameter values, None in case tuning is not performed 
 
         Returns
         -------
@@ -282,6 +307,8 @@ class TrajectoryGAN:
             # logging the process of an epoch with the MSE, generator and discriminator loss as well as time needed
             logger.print_me(f'#{epoch:5d} | MSE = {mse_loss:.5f} | Loss G = {g_loss:.4f} '
                             f'| Loss D = {d_loss:.4f} | time = {toc - tic:.2f} s')
+            if trial is not None:
+                trial.report(mse_loss, step=epoch)
 
             if epoch % 50 == 0:  # save a model for each 50 epochs
                 self.save_model(saving_path, model_name, epoch)
@@ -332,8 +359,34 @@ if __name__ == '__main__':
     gan = TrajectoryGAN(conf)
 
     training = conf['TrajectoryGAN']['Train']
+    hypertune =conf['TrajectoryGAN']['Tune']
 
-    if training:
+    if hypertune and training:
+        logger = Logger(f'{conf["Logger"]}_{model_name}.txt')
+        
+        gan.load_dataset(conf['DatasetPath'])
+        
+        study = optuna.create_study(direction="minimize")
+        study.optimize(lambda trial: gan.objective(trial,saving_path, model_name), n_trials=20)
+
+        pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
+        complete_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+
+        print("Study statistics: ")
+        print("  Number of finished trials: ", len(study.trials))
+        print("  Number of pruned trials: ", len(pruned_trials))
+        print("  Number of complete trials: ", len(complete_trials))
+
+        print("Best trial:")
+        trial = study.best_trial
+
+        print("  Value: ", trial.value)
+
+        print("  Params: ")
+        for key, value in trial.params.items():
+            print("    {}: {}".format(key, value))
+
+    elif training:
         logger = Logger(f'{conf["Logger"]}_{model_name}.txt')
         # Train
         gan.load_dataset(conf['DatasetPath'])
